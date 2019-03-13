@@ -28,19 +28,26 @@ def _generate_minibatches(X, y, batch_size=32):
 
         yield batch_i, X[batch_start:batch_end], y[batch_start:batch_end]
 
+        ix += batch_size
+
 
 class MLP:
-    def __init__(self, n_inputs, n_hidden, n_outputs, learning_rate):
+    def __init__(self, n_inputs, n_hidden, n_outputs, learning_rate=1.0, momemtum=0.9):
         self.learning_rate = learning_rate
+        self.momentum = momemtum
         self.n_inputs = n_inputs
         self.n_hidden = n_hidden
         self.n_outputs = n_outputs
 
         self.prev_input = None
+        self.prev_dW_0 = 0
+        self.prev_db_0 = 0
         self.W_0 = np.random.normal(0, 1.0, (n_hidden, n_inputs)) * np.sqrt(1.0 / n_inputs)
         self.b_0 = np.random.normal(0, 1.0, n_hidden)
         self.hidden_activation = None
 
+        self.prev_dW_1 = 0
+        self.prev_db_1 = 0
         self.W_1 = np.random.normal(0, 1.0, (n_outputs, n_hidden)) * np.sqrt(1.0 / n_hidden)
         self.b_1 = np.random.normal(0, 1.0, n_outputs)
         self.output_activation = None
@@ -72,10 +79,15 @@ class MLP:
         output_error = errors * MLP.dsigmoid(self.output_activation)
         hidden_error = output_error.dot(self.W_1) * MLP.dsigmoid(self.hidden_activation)
 
-        dW_1 = self.learning_rate * output_error * self.hidden_activation
-        db_1 = self.learning_rate * output_error
-        dW_0 = self.learning_rate * hidden_error * self.prev_input
-        db_0 = self.learning_rate * hidden_error
+        dW_1 = self.learning_rate * output_error * self.hidden_activation + self.momentum * self.prev_dW_1
+        db_1 = self.learning_rate * output_error + self.momentum * self.prev_db_1
+        dW_0 = self.learning_rate * hidden_error * self.prev_input + self.momentum * self.prev_dW_0
+        db_0 = self.learning_rate * hidden_error + self.momentum * self.prev_db_0
+
+        self.prev_dW_1 = dW_1
+        self.prev_db_1 = db_1
+        self.prev_dW_0 = dW_0
+        self.prev_db_0 = db_0
 
         self.W_1 += dW_1.mean(axis=0)
         self.b_1 += db_1.mean(axis=0)
