@@ -1,31 +1,4 @@
-import matplotlib.pyplot as plt
 import numpy as np
-
-
-def get_XOR():
-    X = np.array([[0, 0],
-                  [0, 1],
-                  [1, 0],
-                  [1, 1]])
-
-    y = [0, 1, 1, 0]
-
-    return X, y
-
-
-def plot_XOR():
-    X, y = get_XOR()
-    labels = np.unique(y)
-
-    for label in labels:
-        ix = np.where(y == label)
-        plt.scatter(X[ix, 0], X[ix, 1], label=str(label))
-
-    plt.title('Plot of XOR outputs')
-    plt.xlabel('Input 1')
-    plt.ylabel('Input 2')
-    plt.legend(title='XOR Output')
-    plt.show()
 
 
 class MLP:
@@ -36,12 +9,12 @@ class MLP:
         self.n_outputs = n_outputs
 
         self.prev_input = None
-        self.W_0 = np.random.uniform(-0.3, 0.3, (n_hidden, n_inputs))
-        self.b_0 = np.random.uniform(-0.3, 0.3, n_hidden)
+        self.W_0 = np.random.normal(0, 1.0, (n_hidden, n_inputs)) * np.sqrt(1.0 / n_inputs)
+        self.b_0 = np.random.normal(0, 1.0, n_hidden)
         self.hidden_activation = None
 
-        self.W_1 = np.random.uniform(-0.3, 0.3, (n_outputs, n_hidden))
-        self.b_1 = np.random.uniform(-0.3, 0.3, n_outputs)
+        self.W_1 = np.random.normal(0, 1.0, (n_outputs, n_hidden)) * np.sqrt(1.0 / n_hidden)
+        self.b_1 = np.random.normal(0, 1.0, n_outputs)
         self.output_activation = None
 
     @staticmethod
@@ -73,28 +46,28 @@ class MLP:
         hidden_error = output_error.dot(self.W_1) * MLP.dsigmoid(self.hidden_activation)
 
         dW_1 = self.learning_rate * output_error * self.hidden_activation
+        db_1 = self.learning_rate * output_error
         dW_0 = self.learning_rate * hidden_error * self.prev_input
+        db_0 = self.learning_rate * hidden_error
 
-        print(output_error, dW_1)
-        print(hidden_error, dW_0)
+        self.W_1 += dW_1
+        self.b_1 += db_1
+        self.W_0 += dW_0
+        self.b_0 += db_0
 
-        self.W_1 -= dW_1
-        self.W_0 -= dW_0
+    def fit(self, X, y, n_epochs):
+        for epoch in range(n_epochs):
+            print('Epoch %d of %d' % (epoch + 1, n_epochs))
+            errors = []
 
+            for instance, target in zip(X, y):
+                target_pred = self.forward(instance)
+                error = target - target_pred
+                errors.append(error)
+                print('Pattern: %s - Target: %d - Predicted Target: %.4f' % (
+                    instance, target, target_pred))
+                self.backward(target, target_pred)
 
-if __name__ == '__main__':
-    np.random.seed(42)
+            rmse = np.sqrt(np.mean(np.square(errors)))
 
-    X, y = get_XOR()
-    mlp = MLP(X.shape[1], 2, 1, 0.1)
-
-    n_epochs = 10
-
-    for epoch in range(n_epochs):
-        print('Epoch %d of %d' % (epoch + 1, n_epochs))
-
-        for instance, label in zip(*get_XOR()):
-            label_pred = mlp.forward(instance)
-            rmse = np.sqrt(np.square(label - label_pred))
-            print('Pattern: %s - Label: %d - Predicted Label: %.4f - RMSE: %.4f' % (instance, label, label_pred, rmse))
-            mlp.backward(label, label_pred)
+            print('RMSE: %.4f' % rmse)
