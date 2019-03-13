@@ -103,7 +103,10 @@ class MLP:
         for layer in reversed(self.layers):
             error_grad = layer.backward(error_grad)
 
-    def fit(self, X, y, n_epochs=100, batch_size=-1):
+    def fit(self, X, y, n_epochs=100, batch_size=-1, early_stopping_threshold=-1):
+        best_score = 2 ** 31 - 1
+        epochs_no_improvement = 0
+
         for epoch in range(n_epochs):
             epoch_error_history = np.array([])
 
@@ -116,6 +119,16 @@ class MLP:
             rmse = np.sqrt(np.mean(np.square(epoch_error_history)))
 
             print('Epoch %d of %d - RMSE: %.4f' % (epoch + 1, n_epochs, rmse))
+
+            if best_score - rmse > 1e-9:
+                best_score = rmse
+                epochs_no_improvement = 0
+            else:
+                epochs_no_improvement += 1
+
+            if early_stopping_threshold > 0 and epochs_no_improvement > early_stopping_threshold:
+                print('Stopping early.')
+                break
 
     def predict_proba(self, X):
         return self.forward(X)
