@@ -31,68 +31,77 @@ def _generate_minibatches(X, y, batch_size=32):
         ix += batch_size
 
 
-class MLP:
-    def __init__(self, n_inputs, n_hidden, n_outputs, learning_rate=1.0, momemtum=0.9):
-        self.learning_rate = learning_rate
-        self.momentum = momemtum
-        self.n_inputs = n_inputs
-        self.n_hidden = n_hidden
-        self.n_outputs = n_outputs
-
+class Layer:
+    def __init__(self, n_inputs, n_units, activation_func, is_output=False):
         self.prev_input = None
-        self.prev_dW_0 = 0
-        self.prev_db_0 = 0
-        self.W_0 = np.random.normal(0, 1.0, (n_hidden, n_inputs)) * np.sqrt(1.0 / n_inputs)
-        self.b_0 = np.random.normal(0, 1.0, n_hidden)
-        self.hidden_activation = None
-
-        self.prev_dW_1 = 0
-        self.prev_db_1 = 0
-        self.W_1 = np.random.normal(0, 1.0, (n_outputs, n_hidden)) * np.sqrt(1.0 / n_hidden)
-        self.b_1 = np.random.normal(0, 1.0, n_outputs)
-        self.output_activation = None
-
-    @staticmethod
-    def sigmoid(X):
-        Z = np.exp(X)
-
-        return Z / (Z + 1)
-
-    @staticmethod
-    def dsigmoid(Y):
-        return Y * (1 - Y)
+        self.prev_dW = 0
+        self.prev_db = 0
+        self.W = np.random.normal(0, 1, (n_units, n_inputs)) * np.sqrt(1.0 / n_inputs)
+        self.b = np.random.normal(0, 1, n_units)
+        self.activation_value = None
+        self.activation_func = activation_func
+        self.is_output = is_output
+        self.network = None
+        self.next_layer = None
 
     def forward(self, X):
         self.prev_input = X
 
-        output = X.dot(self.W_0) + self.b_0
-        output = MLP.sigmoid(output)
-        self.hidden_activation = output
+        output = np.matmul(X, self.W.T) + self.b
+        output = self.activation_func(output)
 
-        output = output.dot(self.W_1.T) + self.b_1
-        output = MLP.sigmoid(output)
-        self.output_activation = output
+        self.activation_value = output
 
         return output
 
     def backward(self, errors):
-        output_error = errors * MLP.dsigmoid(self.output_activation)
-        hidden_error = output_error.dot(self.W_1) * MLP.dsigmoid(self.hidden_activation)
+        if self.is_output:
+            error_grad = errors
+        else:
+            error_grad = errors.dot(self.next_layer.W)
 
-        dW_1 = self.learning_rate * output_error * self.hidden_activation + self.momentum * self.prev_dW_1
-        db_1 = self.learning_rate * output_error + self.momentum * self.prev_db_1
-        dW_0 = self.learning_rate * hidden_error * self.prev_input + self.momentum * self.prev_dW_0
-        db_0 = self.learning_rate * hidden_error + self.momentum * self.prev_db_0
+        error_grad *= self.activation_func.derivative(self.activation_value)
 
-        self.prev_dW_1 = dW_1
-        self.prev_db_1 = db_1
-        self.prev_dW_0 = dW_0
-        self.prev_db_0 = db_0
+        dW = self.network.learning_rate * error_grad * self.prev_input + self.network.momentum * self.prev_dW
+        db = self.network.learning_rate * error_grad + self.network.momentum * self.prev_db
 
-        self.W_1 += dW_1.mean(axis=0)
-        self.b_1 += db_1.mean(axis=0)
-        self.W_0 += dW_0.mean(axis=0)
-        self.b_0 += db_0.mean(axis=0)
+        self.W += dW.mean(axis=0)
+        self.b += db.mean(axis=0)
+
+        self.prev_dW = dW
+        self.prev_db = db
+
+        return error_grad
+
+
+class MLP:
+    def __init__(self, learning_rate=1.0, momemtum=0.9):
+        self.learning_rate = learning_rate
+        self.momentum = momemtum
+        self.layers = []
+
+    def add(self, layer):
+        if len(self.layers) > 0:
+            self.layers[-1].is_output = False
+            self.layers[-1].next_layer = layer
+
+        layer.network = self
+        layer.is_output = True
+        self.layers.append(layer)
+
+    def forward(self, X):
+        output = X
+
+        for layer in self.layers:
+            output = layer.forward(output)
+
+        return output
+
+    def backward(self, errors):
+        error_grad = errors
+
+        for layer in reversed(self.layers):
+            error_grad = layer.backward(error_grad)
 
     def fit(self, X, y, n_epochs=100, batch_size=-1):
         for epoch in range(n_epochs):
