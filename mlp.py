@@ -33,13 +33,13 @@ def _generate_minibatches(X, y, batch_size=32):
 
 class Layer:
     def __init__(self, n_inputs, n_units, activation_func, is_output=False):
-        self.prev_input = None
-        self.prev_dW = 0
-        self.prev_db = 0
         self.n_inputs = n_inputs
         self.n_units = n_units
         self.W = np.random.normal(0, 1, (n_inputs, n_units)) * np.sqrt(1.0 / n_inputs)
         self.b = np.random.normal(0, 1, n_units)
+        self.prev_dW = np.zeros_like(self.W)
+        self.prev_db = np.zeros_like(self.b)
+        self.prev_input = None
         self.activation_value = None
         self.preactivation_value = None
         self.activation_func = activation_func
@@ -70,8 +70,9 @@ class Layer:
                     delta[n, j] = errors[n] * self.activation_func.derivative(self.activation_value[n, j])
 
                     for i in range(self.n_inputs):
-                        dW[n, i, j] = self.network.learning_rate * delta[n, j] * self.prev_input[n, i]
-                        db[n, j] = self.network.learning_rate * delta[n, j]
+                        dW[n, i, j] = self.network.learning_rate * delta[n, j] * self.prev_input[
+                            n, i] + self.network.momentum * self.prev_dW[i, j]
+                        db[n, j] = self.network.learning_rate * delta[n, j] + self.network.momentum * self.prev_db[j]
 
         else:
             for n in range(N):
@@ -82,14 +83,15 @@ class Layer:
                     delta[n, j] *= self.activation_func.derivative(self.activation_value[n, j])
 
                     for i in range(self.n_inputs):
-                        dW[n, i, j] = self.network.learning_rate * delta[n, j] * self.prev_input[n, i]
-                        db[n, j] = self.network.learning_rate * delta[n, j]
+                        dW[n, i, j] = self.network.learning_rate * delta[n, j] * self.prev_input[
+                            n, i] + self.network.momentum * self.prev_dW[i, j]
+                        db[n, j] = self.network.learning_rate * delta[n, j] + self.network.momentum * self.prev_db[j]
 
         self.W += dW.mean(axis=0)
         self.b += db.mean(axis=0)
 
-        self.prev_dW = dW
-        self.prev_db = db
+        self.prev_dW = dW.mean(axis=0)
+        self.prev_db = db.mean(axis=0)
 
         return delta
 
