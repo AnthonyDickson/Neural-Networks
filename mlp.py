@@ -36,9 +36,12 @@ class Layer:
         self.prev_input = None
         self.prev_dW = 0
         self.prev_db = 0
-        self.W = np.random.normal(0, 1, (n_units, n_inputs)) * np.sqrt(1.0 / n_inputs)
+        self.n_inputs = n_inputs
+        self.n_units = n_units
+        self.W = np.random.normal(0, 1, (n_inputs, n_units)) * np.sqrt(1.0 / n_inputs)
         self.b = np.random.normal(0, 1, n_units)
         self.activation_value = None
+        self.preactivation_value = None
         self.activation_func = activation_func
         self.is_output = is_output
         self.network = None
@@ -47,23 +50,40 @@ class Layer:
     def forward(self, X):
         self.prev_input = X
 
-        output = np.matmul(X, self.W.T) + self.b
-        output = self.activation_func(output)
+        output = np.matmul(X, self.W) + self.b
+        self.preactivation_value = output
 
+        output = self.activation_func(output)
         self.activation_value = output
 
         return output
 
     def backward(self, errors):
+        N = errors.shape[0]
+        delta = np.zeros((N, self.n_units))
+        dW = np.zeros((N, *self.W.shape))
+        db = np.zeros((N, *self.b.shape))
+
         if self.is_output:
-            error_grad = errors
+            for n in range(N):
+                for j in range(self.n_units):
+                    delta[n, j] = errors[n] * self.activation_func.derivative(self.activation_value[n, j])
+
+                    for i in range(self.n_inputs):
+                        dW[n, i, j] = self.network.learning_rate * delta[n, j] * self.prev_input[n, i]
+                        db[n, j] = self.network.learning_rate * delta[n, j]
+
         else:
-            error_grad = errors.dot(self.next_layer.W)
+            for n in range(N):
+                for j in range(self.n_units):
+                    for k in range(self.next_layer.n_units):
+                        delta[n, j] += errors[n, k] * self.next_layer.W[j, k]
 
-        error_grad *= self.activation_func.derivative(self.activation_value)
+                    delta[n, j] *= self.activation_func.derivative(self.activation_value[n, j])
 
-        dW = self.network.learning_rate * error_grad * self.prev_input + self.network.momentum * self.prev_dW
-        db = self.network.learning_rate * error_grad + self.network.momentum * self.prev_db
+                    for i in range(self.n_inputs):
+                        dW[n, i, j] = self.network.learning_rate * delta[n, j] * self.prev_input[n, i]
+                        db[n, j] = self.network.learning_rate * delta[n, j]
 
         self.W += dW.mean(axis=0)
         self.b += db.mean(axis=0)
@@ -71,7 +91,7 @@ class Layer:
         self.prev_dW = dW
         self.prev_db = db
 
-        return error_grad
+        return delta
 
 
 class MLP:
@@ -103,7 +123,7 @@ class MLP:
         for layer in reversed(self.layers):
             error_grad = layer.backward(error_grad)
 
-    def fit(self, X, y, n_epochs=100, batch_size=-1, early_stopping_threshold=-1):
+    def fit(self, X, y, n_epochs=100, batch_size=-1, early_stopping_threshold=-1, early_stopping_min_improvement=1e-5):
         best_score = 2 ** 31 - 1
         epochs_no_improvement = 0
 
@@ -120,7 +140,7 @@ class MLP:
 
             print('Epoch %d of %d - RMSE: %.4f' % (epoch + 1, n_epochs, rmse))
 
-            if best_score - rmse > 1e-9:
+            if best_score - rmse > early_stopping_min_improvement:
                 best_score = rmse
                 epochs_no_improvement = 0
             else:
