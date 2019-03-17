@@ -47,6 +47,10 @@ class Layer:
         self.network = None
         self.next_layer = None
 
+    @property
+    def shape(self):
+        return self.W.shape
+
     def forward(self, X):
         self.prev_input = X
 
@@ -65,24 +69,27 @@ class Layer:
         db = np.zeros((N, *self.b.shape))
 
         for n in range(N):
+            if self.is_output:
+                delta = errors
+            else:
+                delta = errors.dot(self.next_layer.W.T)
+
+            delta *= self.activation_func.derivative(self.activation_value)
+
             for j in range(self.n_units):
-                if self.is_output:
-                    delta[n, j] = errors[n]
-                else:
-                    delta[n, j] = errors[n].dot(self.next_layer.W[j])
-
-                delta[n, j] *= self.activation_func.derivative(self.activation_value[n, j])
-
                 for i in range(self.n_inputs):
-                    dW[n, i, j] = self.network.learning_rate * delta[n, j] * self.prev_input[
-                        n, i] + self.network.momentum * self.prev_dW[i, j]
+                    dW[n, i, j] = self.network.learning_rate * delta[n, j] * \
+                                  self.prev_input[n, i] + self.network.momentum * self.prev_dW[i, j]
                     db[n, j] = self.network.learning_rate * delta[n, j] + self.network.momentum * self.prev_db[j]
 
-        self.W += dW.mean(axis=0)
-        self.b += db.mean(axis=0)
+        dW_mean = dW.mean(axis=0)
+        db_mean = db.mean(axis=0)
 
-        self.prev_dW = dW.mean(axis=0)
-        self.prev_db = db.mean(axis=0)
+        self.W += dW_mean
+        self.b += db_mean
+
+        self.prev_dW = dW_mean
+        self.prev_db = db_mean
 
         return delta
 
