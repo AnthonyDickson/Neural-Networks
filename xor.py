@@ -4,16 +4,17 @@ from sklearn import utils
 
 from activation_functions import Sigmoid, Identity
 from datasets import load_XOR
-from mlp import MLP, Layer
+from mlp import MLP, DenseLayer
 
 if __name__ == '__main__':
     np.random.seed(42)
 
     X, y = load_XOR()
     X, y = utils.shuffle(X, y, random_state=42)
-    mlp = MLP(0.1)
-    mlp.add(Layer(2, n_inputs=2, activation_func=Sigmoid()))
-    mlp.add(Layer(1, activation_func=Identity()))
+
+    mlp = MLP([DenseLayer(2, n_inputs=2, activation_func=Sigmoid()),
+               DenseLayer(1, activation_func=Identity())],
+              learning_rate=0.1)
 
     error_history = mlp.fit(X, y, n_epochs=10000, batch_size=1, early_stopping_threshold=100)
     print("Targets: %s - Predictions: %s" % (y.ravel(), mlp.predict(X).ravel()))

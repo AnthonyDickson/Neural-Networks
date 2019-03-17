@@ -35,7 +35,7 @@ def _generate_minibatches(X, y, batch_size=32):
         ix += batch_size
 
 
-class Layer:
+class DenseLayer:
     def __init__(self, n_units, n_inputs=None, activation_func=None):
         self.n_inputs = n_inputs
         self.n_units = n_units
@@ -102,12 +102,17 @@ class Layer:
 
 
 class MLP:
-    def __init__(self, learning_rate=1.0, momentum=0.9):
+    def __init__(self, layers, learning_rate=1.0, momentum=0.9):
+        assert len(layers) > 0, "You need to define at least one layer for the network."
+
         self.learning_rate = learning_rate
         self.momentum = momentum
         self.layers = []
 
-    def add(self, layer):
+        for layer in layers:
+            self._add(layer)
+
+    def _add(self, layer):
         if len(self.layers) > 0:
             self.layers[-1].is_output = False
             self.layers[-1].next_layer = layer
@@ -115,6 +120,10 @@ class MLP:
             if layer.n_inputs is None:
                 # We need to infer the input shape from the previous layer.
                 layer.n_inputs = self.layers[-1].n_units
+            else:
+                assert layer.n_inputs == self.layers[-1].n_units, \
+                    "The number of inputs for layer %d does not match the number of units in the previous layer " \
+                    "(%d != %d)." % (len(self.layers), layer.n_inputs, self.layers[-1].n_units)
         else:
             assert layer.n_inputs is not None, "The number of inputs for the first layer must be explicitly specified."
 
@@ -125,8 +134,6 @@ class MLP:
         self.layers.append(layer)
 
     def _forward(self, X):
-        assert len(self.layers) > 0, "The MLP needs at least one layer, however it currently has zero!"
-
         output = X
 
         for layer in self.layers:
