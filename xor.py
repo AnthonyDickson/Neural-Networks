@@ -2,9 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import utils
 
-from activation_functions import Sigmoid, Identity
-from datasets import load_XOR
-from mlp import MLPRegressor, DenseLayer
+from mlp.activation_functions import Sigmoid, Identity
+from mlp.datasets import load_XOR
+from mlp.network import MLPRegressor, DenseLayer
 
 if __name__ == '__main__':
     np.random.seed(42)

@@ -9,8 +9,8 @@ The main classes are:
 
 import numpy as np
 
-from activation_functions import Identity
-from losses import RMSE, CrossEntropy
+from mlp.activation_functions import Identity
+from mlp.losses import RMSE, CrossEntropy
 
 
 def _generate_minibatches(X, y, batch_size=32):
