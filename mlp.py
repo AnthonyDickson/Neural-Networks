@@ -64,28 +64,19 @@ class Layer:
         dW = np.zeros((N, *self.W.shape))
         db = np.zeros((N, *self.b.shape))
 
-        if self.is_output:
-            for n in range(N):
-                for j in range(self.n_units):
-                    delta[n, j] = errors[n] * self.activation_func.derivative(self.activation_value[n, j])
+        for n in range(N):
+            for j in range(self.n_units):
+                if self.is_output:
+                    delta[n, j] = errors[n]
+                else:
+                    delta[n, j] = errors[n].dot(self.next_layer.W[j])
 
-                    for i in range(self.n_inputs):
-                        dW[n, i, j] = self.network.learning_rate * delta[n, j] * self.prev_input[
-                            n, i] + self.network.momentum * self.prev_dW[i, j]
-                        db[n, j] = self.network.learning_rate * delta[n, j] + self.network.momentum * self.prev_db[j]
+                delta[n, j] *= self.activation_func.derivative(self.activation_value[n, j])
 
-        else:
-            for n in range(N):
-                for j in range(self.n_units):
-                    for k in range(self.next_layer.n_units):
-                        delta[n, j] += errors[n, k] * self.next_layer.W[j, k]
-
-                    delta[n, j] *= self.activation_func.derivative(self.activation_value[n, j])
-
-                    for i in range(self.n_inputs):
-                        dW[n, i, j] = self.network.learning_rate * delta[n, j] * self.prev_input[
-                            n, i] + self.network.momentum * self.prev_dW[i, j]
-                        db[n, j] = self.network.learning_rate * delta[n, j] + self.network.momentum * self.prev_db[j]
+                for i in range(self.n_inputs):
+                    dW[n, i, j] = self.network.learning_rate * delta[n, j] * self.prev_input[
+                        n, i] + self.network.momentum * self.prev_dW[i, j]
+                    db[n, j] = self.network.learning_rate * delta[n, j] + self.network.momentum * self.prev_db[j]
 
         self.W += dW.mean(axis=0)
         self.b += db.mean(axis=0)
