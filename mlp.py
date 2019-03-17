@@ -1,4 +1,8 @@
+"""TODO: Add docstrings!"""
+
 import numpy as np
+
+from activation_functions import Identity
 
 
 def _generate_minibatches(X, y, batch_size=32):
@@ -13,7 +17,7 @@ def _generate_minibatches(X, y, batch_size=32):
         batch_size = N
         n_batches = 1
         last_batch_size = batch_size
-    else:  # minibatch sgd
+    else:  # mini-batch sgd
         n_batches, last_batch_size = divmod(N, batch_size)
         n_batches = n_batches + (1 if last_batch_size > 0 else 0)
 
@@ -32,20 +36,30 @@ def _generate_minibatches(X, y, batch_size=32):
 
 
 class Layer:
-    def __init__(self, n_inputs, n_units, activation_func, is_output=False):
+    def __init__(self, n_units, n_inputs=None, activation_func=None):
         self.n_inputs = n_inputs
         self.n_units = n_units
-        self.W = np.random.normal(0, 1, (n_inputs, n_units)) * np.sqrt(1.0 / n_inputs)
-        self.b = np.random.normal(0, 1, (1, n_units))
-        self.prev_dW = np.zeros_like(self.W)
-        self.prev_db = np.zeros_like(self.b)
+
+        self.W = None
+        self.b = None
+        self.prev_dW = None
+        self.prev_db = None
+
         self.prev_input = None
         self.activation_value = None
         self.preactivation_value = None
-        self.activation_func = activation_func
-        self.is_output = is_output
+
+        self.activation_func = activation_func if activation_func is not None else Identity()
+
+        self.is_output = False
         self.network = None
         self.next_layer = None
+
+    def initalise_weights(self):
+        self.W = np.random.normal(0, 1, (self.n_inputs, self.n_units)) * np.sqrt(1.0 / self.n_inputs)
+        self.b = np.random.normal(0, 1, (1, self.n_units))
+        self.prev_dW = np.zeros_like(self.W)
+        self.prev_db = np.zeros_like(self.b)
 
     @property
     def shape(self):
@@ -98,11 +112,21 @@ class MLP:
             self.layers[-1].is_output = False
             self.layers[-1].next_layer = layer
 
+            if layer.n_inputs is None:
+                # We need to infer the input shape from the previous layer.
+                layer.n_inputs = self.layers[-1].n_units
+        else:
+            assert layer.n_inputs is not None, "The number of inputs for the first layer must be explicitly specified."
+
         layer.network = self
         layer.is_output = True
+        layer.initalise_weights()
+
         self.layers.append(layer)
 
-    def forward(self, X):
+    def _forward(self, X):
+        assert len(self.layers) > 0, "The MLP needs at least one layer, however it currently has zero!"
+
         output = X
 
         for layer in self.layers:
@@ -110,7 +134,7 @@ class MLP:
 
         return output
 
-    def backward(self, errors):
+    def _backward(self, errors):
         error_grad = errors
 
         for layer in reversed(self.layers):
@@ -125,9 +149,9 @@ class MLP:
             epoch_error_history = np.array([])
 
             for _, X_batch, y_batch in _generate_minibatches(X, y, batch_size):
-                target_pred = self.forward(X_batch)
+                target_pred = self._forward(X_batch)
                 errors = y_batch - target_pred
-                self.backward(errors)
+                self._backward(errors)
                 epoch_error_history = np.append(epoch_error_history, errors)
 
             rmse = np.sqrt(np.mean(np.square(epoch_error_history)))
@@ -147,13 +171,10 @@ class MLP:
 
         return error_history
 
-    def predict_proba(self, X):
-        return self.forward(X)
-
     def predict(self, X):
-        return np.argmax(self.predict_proba(X), axis=0)
+        return self._forward(X)
 
     def score(self, X, y):
-        y_pred = self.predict_proba(X)
+        y_pred = self.predict(X)
 
         return np.sqrt(np.mean(np.square(y - y_pred)))
