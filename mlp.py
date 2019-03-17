@@ -36,7 +36,7 @@ class Layer:
         self.n_inputs = n_inputs
         self.n_units = n_units
         self.W = np.random.normal(0, 1, (n_inputs, n_units)) * np.sqrt(1.0 / n_inputs)
-        self.b = np.random.normal(0, 1, n_units)
+        self.b = np.random.normal(0, 1, (1, n_units))
         self.prev_dW = np.zeros_like(self.W)
         self.prev_db = np.zeros_like(self.b)
         self.prev_input = None
@@ -64,8 +64,6 @@ class Layer:
 
     def backward(self, errors):
         N = errors.shape[0]
-        dW = np.zeros((N, *self.W.shape))
-        db = np.zeros((N, *self.b.shape))
 
         if self.is_output:
             delta = errors
@@ -75,11 +73,7 @@ class Layer:
         delta *= self.activation_func.derivative(self.activation_value)
 
         dW = self.network.learning_rate * np.matmul(self.prev_input.T, delta) + self.network.momentum * self.prev_dW
-
-        for n in range(N):
-            for j in range(self.n_units):
-                for i in range(self.n_inputs):
-                    db[n, j] = self.network.learning_rate * delta[n, j] + self.network.momentum * self.prev_db[j]
+        db = self.network.learning_rate * delta + self.network.momentum * self.prev_db
 
         dW_mean = dW / N
         db_mean = db.mean(axis=0)
@@ -94,9 +88,9 @@ class Layer:
 
 
 class MLP:
-    def __init__(self, learning_rate=1.0, momemtum=0.9):
+    def __init__(self, learning_rate=1.0, momentum=0.9):
         self.learning_rate = learning_rate
-        self.momentum = momemtum
+        self.momentum = momentum
         self.layers = []
 
     def add(self, layer):
