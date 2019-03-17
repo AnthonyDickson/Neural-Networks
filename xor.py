@@ -16,7 +16,7 @@ if __name__ == '__main__':
                         DenseLayer(1, activation_func=Identity())],
                        learning_rate=0.1)
 
-    loss_history = mlp.fit(X, y, n_epochs=10000, batch_size=1, early_stopping_threshold=100)
+    loss_history = mlp.fit(X, y, n_epochs=10000, batch_size=1, early_stopping_patience=100, log_verbosity=100)
     print("Targets: %s - Predictions: %s" % (y.ravel(), mlp.predict(X).ravel()))
     print("Score: %.4f (Lower is better)" % mlp.score(X, y))
 

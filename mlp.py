@@ -149,7 +149,9 @@ class MLPRegressor:
         for layer in reversed(self.layers):
             error_grad = layer.backward(error_grad)
 
-    def fit(self, X, y, n_epochs=100, batch_size=-1, early_stopping_threshold=-1, early_stopping_min_improvement=1e-5):
+    def fit(self, X, y, n_epochs=100, batch_size=-1, early_stopping_patience=-1, early_stopping_threshold=1e-2,
+            early_stopping_min_improvement=1e-5,
+            log_verbosity=1):
         min_loss = 2 ** 31 - 1
         epochs_no_improvement = 0
         loss_history = []
@@ -167,7 +169,8 @@ class MLPRegressor:
             epoch_loss = epoch_loss_history.mean()
             loss_history.append(epoch_loss)
 
-            print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, loss_history[-1]))
+            if epoch % log_verbosity == 0:
+                print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, loss_history[-1]))
 
             if min_loss - epoch_loss > early_stopping_min_improvement:
                 min_loss = epoch_loss
@@ -175,8 +178,12 @@ class MLPRegressor:
             else:
                 epochs_no_improvement += 1
 
-            if early_stopping_threshold > 0 and epochs_no_improvement > early_stopping_threshold:
-                print('Stopping early.')
+            if early_stopping_patience > 0 and epochs_no_improvement > early_stopping_patience:
+                print('Stopping early - loss has stopped improving.')
+                break
+
+            if epoch_loss < early_stopping_threshold:
+                print('Stopping early - reached target error criterion.')
                 break
 
         return loss_history
