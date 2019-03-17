@@ -64,25 +64,24 @@ class Layer:
 
     def backward(self, errors):
         N = errors.shape[0]
-        delta = np.zeros((N, self.n_units))
         dW = np.zeros((N, *self.W.shape))
         db = np.zeros((N, *self.b.shape))
 
+        if self.is_output:
+            delta = errors
+        else:
+            delta = errors.dot(self.next_layer.W.T)
+
+        delta *= self.activation_func.derivative(self.activation_value)
+
+        dW = self.network.learning_rate * np.matmul(self.prev_input.T, delta) + self.network.momentum * self.prev_dW
+
         for n in range(N):
-            if self.is_output:
-                delta = errors
-            else:
-                delta = errors.dot(self.next_layer.W.T)
-
-            delta *= self.activation_func.derivative(self.activation_value)
-
             for j in range(self.n_units):
                 for i in range(self.n_inputs):
-                    dW[n, i, j] = self.network.learning_rate * delta[n, j] * \
-                                  self.prev_input[n, i] + self.network.momentum * self.prev_dW[i, j]
                     db[n, j] = self.network.learning_rate * delta[n, j] + self.network.momentum * self.prev_db[j]
 
-        dW_mean = dW.mean(axis=0)
+        dW_mean = dW / N
         db_mean = db.mean(axis=0)
 
         self.W += dW_mean

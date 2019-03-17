@@ -14,6 +14,6 @@ if __name__ == '__main__':
     mlp.add(Layer(2, 3, Sigmoid()))
     mlp.add(Layer(3, 1, Identity()))
 
-    mlp.fit(X, y, n_epochs=10000, batch_size=4, early_stopping_threshold=10)
+    mlp.fit(X, y, n_epochs=10000, batch_size=-1, early_stopping_threshold=0)
     print("Targets: %s - Predictions: %s" % (y.ravel(), mlp.predict_proba(X).ravel()))
     print("Score: %.4f (Lower is better)" % mlp.score(X, y))
