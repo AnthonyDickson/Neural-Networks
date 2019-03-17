@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import utils
 
@@ -14,6 +15,9 @@ if __name__ == '__main__':
     mlp.add(Layer(2, 2, Sigmoid()))
     mlp.add(Layer(2, 1, Identity()))
 
-    mlp.fit(X, y, n_epochs=10000, batch_size=1, early_stopping_threshold=100)
+    error_history = mlp.fit(X, y, n_epochs=10000, batch_size=1, early_stopping_threshold=100)
     print("Targets: %s - Predictions: %s" % (y.ravel(), mlp.predict_proba(X).ravel()))
     print("Score: %.4f (Lower is better)" % mlp.score(X, y))
+
+    plt.plot(error_history)
+    plt.show()

@@ -119,6 +119,7 @@ class MLP:
     def fit(self, X, y, n_epochs=100, batch_size=-1, early_stopping_threshold=-1, early_stopping_min_improvement=1e-5):
         best_score = 2 ** 31 - 1
         epochs_no_improvement = 0
+        error_history = []
 
         for epoch in range(n_epochs):
             epoch_error_history = np.array([])
@@ -130,6 +131,7 @@ class MLP:
                 epoch_error_history = np.append(epoch_error_history, errors)
 
             rmse = np.sqrt(np.mean(np.square(epoch_error_history)))
+            error_history.append(rmse)
 
             print('Epoch %d of %d - RMSE: %.4f' % (epoch + 1, n_epochs, rmse))
 
@@ -142,6 +144,8 @@ class MLP:
             if early_stopping_threshold > 0 and epochs_no_improvement > early_stopping_threshold:
                 print('Stopping early.')
                 break
+
+        return error_history
 
     def predict_proba(self, X):
         return self.forward(X)
