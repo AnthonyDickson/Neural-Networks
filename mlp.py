@@ -3,6 +3,7 @@
 import numpy as np
 
 from activation_functions import Identity
+from losses import RMSE, CrossEntropy
 
 
 def _generate_minibatches(X, y, batch_size=32):
@@ -101,12 +102,13 @@ class DenseLayer:
         return delta
 
 
-class MLP:
-    def __init__(self, layers, learning_rate=1.0, momentum=0.9):
+class MLPRegressor:
+    def __init__(self, layers, learning_rate=1.0, momentum=0.9, loss_func=None):
         assert len(layers) > 0, "You need to define at least one layer for the network."
 
         self.learning_rate = learning_rate
         self.momentum = momentum
+        self.loss_func = loss_func if loss_func is not None else RMSE()
         self.layers = []
 
         for layer in layers:
@@ -141,33 +143,34 @@ class MLP:
 
         return output
 
-    def _backward(self, errors):
-        error_grad = errors
+    def _backward(self):
+        error_grad = self.loss_func.grad
 
         for layer in reversed(self.layers):
             error_grad = layer.backward(error_grad)
 
     def fit(self, X, y, n_epochs=100, batch_size=-1, early_stopping_threshold=-1, early_stopping_min_improvement=1e-5):
-        best_score = 2 ** 31 - 1
+        min_loss = 2 ** 31 - 1
         epochs_no_improvement = 0
-        error_history = []
+        loss_history = []
 
         for epoch in range(n_epochs):
-            epoch_error_history = np.array([])
+            epoch_loss_history = np.array([])
 
             for _, X_batch, y_batch in _generate_minibatches(X, y, batch_size):
                 target_pred = self._forward(X_batch)
-                errors = y_batch - target_pred
-                self._backward(errors)
-                epoch_error_history = np.append(epoch_error_history, errors)
+                loss = self.loss_func(y_batch, target_pred)
+                epoch_loss_history = np.append(epoch_loss_history, loss)
 
-            rmse = np.sqrt(np.mean(np.square(epoch_error_history)))
-            error_history.append(rmse)
+                self._backward()
 
-            print('Epoch %d of %d - RMSE: %.4f' % (epoch + 1, n_epochs, rmse))
+            epoch_loss = epoch_loss_history.mean()
+            loss_history.append(epoch_loss)
 
-            if best_score - rmse > early_stopping_min_improvement:
-                best_score = rmse
+            print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, loss_history[-1]))
+
+            if min_loss - epoch_loss > early_stopping_min_improvement:
+                min_loss = epoch_loss
                 epochs_no_improvement = 0
             else:
                 epochs_no_improvement += 1
@@ -176,7 +179,7 @@ class MLP:
                 print('Stopping early.')
                 break
 
-        return error_history
+        return loss_history
 
     def predict(self, X):
         return self._forward(X)
@@ -184,4 +187,18 @@ class MLP:
     def score(self, X, y):
         y_pred = self.predict(X)
 
-        return np.sqrt(np.mean(np.square(y - y_pred)))
+        return self.loss_func(y, y_pred)
+
+
+class MLPClassifier(MLPRegressor):
+    def __init__(self, layers, learning_rate=1.0, momentum=0.9, loss_func=None):
+        if loss_func is None:
+            loss_func = CrossEntropy()
+
+        super().__init__(layers, learning_rate, momentum, loss_func)
+
+    def predict_proba(self, X):
+        return self._forward(X)
+
+    def predict(self, X):
+        return np.argmax(self.predict_proba(X), axis=0)
