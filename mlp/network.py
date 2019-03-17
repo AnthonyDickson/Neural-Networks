@@ -40,10 +40,8 @@ def _generate_minibatches(X, y, batch_size=32):
     if batch_size == -1:  # batch sgd
         batch_size = N
         n_batches = 1
-        last_batch_size = batch_size
     else:  # mini-batch sgd
-        n_batches, last_batch_size = divmod(N, batch_size)
-        n_batches = n_batches + (1 if last_batch_size > 0 else 0)
+        n_batches = N // batch_size
 
     ix = 0
 
@@ -52,7 +50,8 @@ def _generate_minibatches(X, y, batch_size=32):
         batch_end = ix + batch_size
 
         if batch_end > N:
-            batch_end = ix + last_batch_size
+            # Differently sized batches cause shape broadcasting errors.
+            break
 
         yield batch_i, X[batch_start:batch_end], y[batch_start:batch_end]
 
@@ -294,10 +293,16 @@ class MLPRegressor:
                 epochs_no_improvement += 1
 
             if early_stopping_patience > 0 and epochs_no_improvement > early_stopping_patience:
+                if log_verbosity > 1 and epoch % log_verbosity != 0:
+                    print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, loss_history[-1]))
+
                 print('Stopping early - loss has stopped improving.')
                 break
 
             if epoch_loss < early_stopping_threshold:
+                if log_verbosity > 1 and epoch % log_verbosity != 0:
+                    print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, loss_history[-1]))
+
                 print('Stopping early - reached target error criterion.')
                 break
 
