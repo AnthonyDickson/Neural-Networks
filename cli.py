@@ -105,7 +105,6 @@ class TrainNetworkCommand(Command):
 
 
 class PlotLossCommand(Command):
-
     def __init__(self):
         name = 'plot'
         usage = '%s [title]' % name
@@ -128,6 +127,17 @@ class PlotLossCommand(Command):
         plt.title(title)
 
         plt.show()
+
+
+class SetRandomSeedCommand(Command):
+    def __init__(self):
+        name = 'set-seed'
+        usage = '%s <random seed>' % name
+
+        super().__init__(name, 'Set the random seed. This helps make things more reproducible,', usage)
+
+    def __call__(self, seed=42):
+        np.random.seed(seed)
 
 
 class CLI:
@@ -224,6 +234,14 @@ class CLI:
                         command(self.loss_history, args)
                     else:
                         command(self.loss_history)
+                elif isinstance(command, SetRandomSeedCommand):
+                    if args:
+                        try:
+                            command(int(args[0]))
+                        except ValueError:
+                            print('Invalid random seed. Random seed must be an integer.')
+                    else:
+                        command()
 
                 break
 
@@ -243,7 +261,8 @@ if __name__ == '__main__':
             QuitCommand(),
             LoadDatasetCommand(datasets),
             TrainNetworkCommand(),
-            PlotLossCommand()
+            PlotLossCommand(),
+            SetRandomSeedCommand()
         ]
 
         cli = CLI(commands)
