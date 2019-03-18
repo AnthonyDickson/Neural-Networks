@@ -35,7 +35,7 @@ class RMSE(Loss):
         error_term = y - y_pred
         self.grad = error_term
 
-        return np.sqrt(np.mean(np.square(error_term)))
+        return np.sqrt(np.mean(np.square(error_term), axis=0))
 
 
 # TODO: Implement cross-entropy loss.

@@ -8,12 +8,13 @@ The main classes are:
 """
 
 import numpy as np
+from sklearn import utils
 
 from mlp.activation_functions import Identity
 from mlp.losses import RMSE, CrossEntropy
 
 
-def _generate_minibatches(X, y, batch_size=32):
+def _generate_minibatches(X, y, batch_size=32, shuffle=False):
     """Generate mini-batches from the given X-y sets.
 
 
@@ -29,8 +30,11 @@ def _generate_minibatches(X, y, batch_size=32):
                     generated for training is equivalent to performing standard
                     SGD.
 
-
+        shuffle: Whether or not to shuffle the data.
     """
+    if shuffle:
+        X, y = utils.shuffle(X, y)
+
     N = len(X)
     assert N == len(y)
     assert batch_size == -1 or batch_size > 0, "Invalid batch size."
@@ -40,8 +44,10 @@ def _generate_minibatches(X, y, batch_size=32):
     if batch_size == -1:  # batch sgd
         batch_size = N
         n_batches = 1
+        last_batch_size = batch_size
     else:  # mini-batch sgd
-        n_batches = N // batch_size
+        n_batches, last_batch_size = divmod(N, batch_size)
+        n_batches = n_batches + (1 if last_batch_size > 0 else 0)
 
     ix = 0
 
@@ -50,8 +56,7 @@ def _generate_minibatches(X, y, batch_size=32):
         batch_end = ix + batch_size
 
         if batch_end > N:
-            # Differently sized batches cause shape broadcasting errors.
-            break
+            batch_end = ix + last_batch_size
 
         yield batch_i, X[batch_start:batch_end], y[batch_start:batch_end]
 

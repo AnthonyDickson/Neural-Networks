@@ -73,6 +73,9 @@ class LoadDatasetCommand(Command):
         y = np.genfromtxt(base_dir + dataset + '/teach.txt')
         params = np.genfromtxt(base_dir + dataset + '/params.txt')
 
+        if len(y.shape) == 1:
+            y = y.reshape(-1, 1)
+
         if shuffle:
             X, y = utils.shuffle(X, y)
 
@@ -81,7 +84,7 @@ class LoadDatasetCommand(Command):
 
 class TrainNetworkCommand(Command):
     def __init__(self):
-        usage = 'train'
+        usage = 'train [batch_size]'
 
         super().__init__('train',
                          description='Train a MLP on the loaded dataset.',
@@ -141,7 +144,12 @@ class CLI:
 
     def main_loop(self):
         while not self.should_quit:
-            command = input("Enter a command: ")
+            try:
+                command = input("Enter a command: ")
+            except EOFError:
+                print()
+                break
+
             command = command.strip()
             command = command.lower()
             parts = command.split()
@@ -192,12 +200,25 @@ class CLI:
                         print(e)
                 elif isinstance(command, TrainNetworkCommand):
                     try:
+                        if args:
+                            batch_size = int(args[0])
+                        else:
+                            batch_size = 1
+
                         self.loss_history = command(self.network,
                                                     self.X, self.y,
+                                                    batch_size=batch_size,
                                                     n_epochs=10000,
                                                     early_stopping_threshold=self.params.error_criterion)
-                    except AttributeError:
-                        print('Model not found. Have you loaded a dataset yet?')
+                    except AttributeError as e:
+                        if self.network is None:
+                            print('Model not found. Have you loaded a dataset yet?')
+                        else:
+                            raise e
+                    except ValueError:
+                        print('Invalid batch size. Batch size must be an integer.')
+                    except KeyboardInterrupt:
+                        print()
                 elif isinstance(command, PlotLossCommand):
                     if args:
                         command(self.loss_history, args)
@@ -212,16 +233,21 @@ class CLI:
 
 if __name__ == '__main__':
     print('Scanning \'data\' directory for data sets...')
-    _, datasets, _ = next(os.walk('data'))
-    print('Found the following data sets: ' + ', '.join(datasets))
 
-    commands = [
-        HelpCommand(),
-        QuitCommand(),
-        LoadDatasetCommand(datasets),
-        TrainNetworkCommand(),
-        PlotLossCommand()
-    ]
+    try:
+        _, datasets, _ = next(os.walk('data'))
+        print('Found the following data sets: ' + ', '.join(datasets))
 
-    cli = CLI(commands)
-    cli.main_loop()
+        commands = [
+            HelpCommand(),
+            QuitCommand(),
+            LoadDatasetCommand(datasets),
+            TrainNetworkCommand(),
+            PlotLossCommand()
+        ]
+
+        cli = CLI(commands)
+        cli.main_loop()
+    except StopIteration:
+        print('\'data\' directory not found.')
+        exit(1)
