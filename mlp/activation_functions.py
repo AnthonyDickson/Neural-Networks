@@ -55,3 +55,11 @@ class Sigmoid(Activation):
 
     def derivative(self, Y):
         return Y * (1 - Y)
+
+
+class ReLU(Activation):
+    def __call__(self, X):
+        return np.where(X > 0, X, np.zeros_like(X))
+
+    def derivative(self, Y):
+        return np.where(Y > 0, np.ones_like(Y), np.zeros_like(Y))
