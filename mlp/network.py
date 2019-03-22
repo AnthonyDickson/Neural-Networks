@@ -7,7 +7,9 @@ The main classes are:
 
 The MLP classes follow a design that is similar to a mix of the Keras API and the scikit-learn estimator API.
 """
+import gzip
 import json
+import pickle
 
 import numpy as np
 from sklearn import utils
@@ -235,7 +237,7 @@ class MLP:
     def json(self):
         """Create a JSON representation of a layer.
 
-        Returns: a JSON-convertable dictionary containing the parameters that describe the layer instance.
+        Returns: a JSON-convertible dictionary containing the hyper-parameters that describe the MLP.
         """
         return dict(
             clf_type=self.__class__.__name__,
@@ -248,11 +250,22 @@ class MLP:
     def save(self, filename):
         """Save a MLP to disk.
 
+        Weights are not save. For restoring weights see `save_weights`.
+
         Arguments:
             filename: The path + filename indicating where to save the MLP.
         """
         with open(filename, 'w') as file:
             json.dump(self.json(), file)
+
+    def save_weights(self, filename):
+        """Save the weights and bias of a MLP to disk.
+
+        Arguments:
+            filename: The path + filename indicating where to save the MLP parameters.
+        """
+        with gzip.open(filename, 'w') as file:
+            pickle.dump([(layer.W, layer.b) for layer in self.layers], file)
 
     @staticmethod
     def from_json(json_dict):
@@ -280,6 +293,8 @@ class MLP:
     def load(filename):
         """Load a MLP from disk.
 
+        Weights are not loaded. For restoring weights see `load_weights`.
+
         Arguments:
             filename: The path + filename indicating where to load the MLP from.
 
@@ -289,6 +304,23 @@ class MLP:
             json_dict = json.load(file)
 
         return MLPRegressor.from_json(json_dict)
+
+    def load_weights(self, filename):
+        """Load the weights and bias of a MLP from disk.
+
+        Arguments:
+            filename: The path + filename indicating where to load the MLP parameters from.
+        """
+        with gzip.open(filename, 'r') as file:
+            weights_bias = pickle.load(file)
+
+        assert len(weights_bias) == len(self.layers), \
+            "Layer count mismatch. This MLP has %d layers, however the file '%s' indicates %d layers." \
+            % (len(self.layers), filename, len(weights_bias))
+
+        for (weights, bias), layer in zip(weights_bias, self.layers):
+            layer.W = weights
+            layer.b = bias
 
 
 class MLPRegressor(MLP):
