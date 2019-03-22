@@ -45,6 +45,16 @@ class Identity(Activation):
         return np.ones_like(Y)
 
 
+class ReLU(Activation):
+    """The rectified linear unit (ReLU) activation function."""
+
+    def __call__(self, X):
+        return np.where(X > 0, X, np.zeros_like(X))
+
+    def derivative(self, Y):
+        return np.where(Y > 0, np.ones_like(Y), np.zeros_like(Y))
+
+
 class Sigmoid(Activation):
     """The sigmoid (or logistic) activation function."""
 
@@ -55,3 +65,16 @@ class Sigmoid(Activation):
 
     def derivative(self, Y):
         return Y * (1 - Y)
+
+
+class Softmax(Activation):
+    """The softmax activation function."""
+
+    def __call__(self, X):
+        Z = np.exp(X)
+
+        return Z / Z.sum(axis=1, keepdims=True)
+
+    def derivative(self, Y):
+        # return np.diagflat(Y) * np.dot(Y, Y.T)
+        return np.ones_like(Y)  # TODO: Is this fine?

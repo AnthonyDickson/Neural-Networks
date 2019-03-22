@@ -11,7 +11,7 @@ import numpy as np
 from sklearn import utils
 
 from mlp.activation_functions import Identity
-from mlp.losses import RMSE, CrossEntropy
+from mlp.losses import RMSE, CategoricalCrossEntropy, BinaryCrossEntropy
 
 
 def _generate_minibatches(X, y, batch_size=32, shuffle=False):
@@ -154,8 +154,8 @@ class DenseLayer:
         dW_mean = dW / N
         db_mean = db.mean(axis=0)
 
-        self.W += dW_mean
-        self.b += db_mean
+        self.W -= dW_mean
+        self.b -= db_mean
 
         self.prev_dW = dW_mean
         self.prev_db = db_mean
@@ -285,7 +285,7 @@ class MLPRegressor:
 
                 self._backward()
 
-            epoch_loss = epoch_loss_history.mean()
+            epoch_loss = epoch_loss_history.mean()  # / self.layers[-1].shape[-1]
             loss_history.append(epoch_loss)
 
             if log_verbosity > 0 and epoch % log_verbosity == 0:
@@ -324,17 +324,18 @@ class MLPRegressor:
         return self._forward(X)
 
     def score(self, X, y):
-        """Calcaulate the loss for given feature and target data sets.
+        """Calculate the score for given feature and target data sets.
 
         Arguments:
             X: The feature data set.
             y: The target data set.
 
-        Returns: The loss of the MLP for the given data sets.
+        Returns: The score of the MLP for the given data sets.
         """
         y_pred = self.predict(X)
 
-        return self.loss_func(y, y_pred)
+        # Pearson R coefficient.
+        return np.mean((y - y.mean()) * (y_pred - y_pred.mean())) / np.sqrt(y.var() * y_pred.var())
 
 
 class MLPClassifier(MLPRegressor):
@@ -357,7 +358,7 @@ class MLPClassifier(MLPRegressor):
             performance of the MLP. This defaults to cross entropy loss.
         """
         if loss_func is None:
-            loss_func = CrossEntropy()
+            loss_func = CategoricalCrossEntropy()
 
         super().__init__(layers, learning_rate, momentum, loss_func)
 
@@ -380,4 +381,17 @@ class MLPClassifier(MLPRegressor):
 
         Returns: The predicted targets for the given feature data.
         """
-        return np.argmax(self.predict_proba(X), axis=0)
+        if isinstance(self.loss_func, BinaryCrossEntropy):
+            y_pred = self.predict_proba(X)
+
+            return np.where(y_pred > 0.5, np.ones_like(y_pred), np.zeros_like(y_pred))
+        else:
+            return np.argmax(self.predict_proba(X), axis=1)
+
+    def score(self, X, y):
+        y_pred = self.predict(X)
+
+        if isinstance(self.loss_func, BinaryCrossEntropy):
+            return np.mean(y == y_pred)
+        else:
+            return np.mean(y.argmax(axis=1) == y_pred)

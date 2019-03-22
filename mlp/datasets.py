@@ -1,8 +1,12 @@
-"""TODO: Add docstrings!"""
-
 import matplotlib.pyplot as plt
 import numpy as np
 
+
+def load_iris():
+    X = np.genfromtxt('data/iris/in.txt')
+    y = np.genfromtxt('data/iris/teach.txt')
+
+    return X, y
 
 def load_XOR():
     X = np.array([[0, 0],
