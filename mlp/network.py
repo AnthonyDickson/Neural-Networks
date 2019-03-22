@@ -22,8 +22,6 @@ from mlp.losses import RMSE, CategoricalCrossEntropy, BinaryCrossEntropy
 def _generate_minibatches(X, y, batch_size=32, shuffle=False):
     """Generate mini-batches from the given X-y sets.
 
-
-
     Arguments:
         X: The feature data set.
         y: The target data set.
@@ -192,14 +190,16 @@ class MLP:
                 if log_verbosity > 1 and epoch % log_verbosity != 0:
                     print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, loss_history[-1]))
 
-                print('Stopping early - loss has stopped improving.')
+                    print('Stopping early - loss has stopped improving.')
+
                 break
 
             if early_stopping_threshold > 0 and epoch_loss < early_stopping_threshold:
                 if log_verbosity > 1 and epoch % log_verbosity != 0:
                     print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, loss_history[-1]))
 
-                print('Stopping early - reached target error criterion.')
+                    print('Stopping early - reached target error criterion.')
+
                 break
 
         return loss_history
