@@ -10,7 +10,6 @@ The main classes are:
 import numpy as np
 from sklearn import utils
 
-from mlp.activation_functions import Identity
 from mlp.losses import RMSE, CategoricalCrossEntropy, BinaryCrossEntropy
 
 
@@ -63,110 +62,10 @@ def _generate_minibatches(X, y, batch_size=32, shuffle=False):
         ix += batch_size
 
 
-class DenseLayer:
-    """A fully connected layer in a neural network."""
-
-    def __init__(self, n_units, n_inputs=None, activation_func=None):
-        """Create a fully connected layer.
-
-        Arguments;
-            n_units: How many units (or artificial neurons) the layer should have.
-
-            n_inputs: How many inputs the layer should accept. If this is set to
-            None then the input size will be inferred from the previous layer.
-
-            activation_func: The activation function to use for this layer.
-            If set the None this defaults to the identity function.
-        """
-        self.n_inputs = n_inputs
-        self.n_units = n_units
-
-        self.W = None
-        self.b = None
-        self.prev_dW = None
-        self.prev_db = None
-
-        self.prev_input = None
-        self.activation_value = None
-        self.preactivation_value = None
-
-        self.activation_func = activation_func if activation_func is not None else Identity()
-
-        self.is_output = False
-        self.network = None
-        self.next_layer = None
-
-    def initialise_weights(self):
-        """Create and initialise the weight and bias matrices."""
-        self.W = np.random.normal(0, 1, (self.n_inputs, self.n_units)) * np.sqrt(1.0 / self.n_inputs)
-        self.b = np.random.normal(0, 1, (1, self.n_units))
-        self.prev_dW = np.zeros_like(self.W)
-        self.prev_db = np.zeros_like(self.b)
-
-    @property
-    def shape(self):
-        """Get the shape of the layer,
-
-        Returns: A 2-tuple containing the number of inputs for each unit and
-        the number of units in the layer.
-        """
-        return self.W.shape
-
-    def forward(self, X):
-        """Perform a forward pass of the MLP.
-
-        Returns: The activation of the layer.
-        """
-        self.prev_input = X
-
-        output = np.matmul(X, self.W) + self.b
-        self.preactivation_value = output
-
-        output = self.activation_func(output)
-        self.activation_value = output
-
-        return output
-
-    def backward(self, error_term):
-        """Perform a backward pass of the layer (i.e. back propagate error) and
-        update weights and biases.
-
-        Arguments:
-            error_term: The error term for the output layer, or the deltas of
-            the previous layer in the case of a hidden layer.
-
-        Returns the calculated deltas for the given layer.
-        """
-        N = error_term.shape[0]
-
-        if self.is_output:
-            delta = error_term
-        else:
-            delta = error_term.dot(self.next_layer.W.T)
-
-        delta *= self.activation_func.derivative(self.activation_value)
-
-        dW = self.network.learning_rate * np.matmul(self.prev_input.T, delta) \
-             + self.network.momentum * self.prev_dW
-        db = self.network.learning_rate * delta + \
-             self.network.momentum * self.prev_db
-
-        dW_mean = dW / N
-        db_mean = db.mean(axis=0)
-
-        self.W -= dW_mean
-        self.b -= db_mean
-
-        self.prev_dW = dW_mean
-        self.prev_db = db_mean
-
-        return delta
-
-
 class MLPRegressor:
     """A MLP for regression tasks."""
 
-    def __init__(self, layers, learning_rate=1.0, momentum=0.9, loss_func=None):
+    def __init__(self, layers=None, learning_rate=1.0, momentum=0.9, loss_func=None):
         """Create a MLP.
 
         Arguments:
@@ -187,38 +86,26 @@ class MLPRegressor:
         self.learning_rate = learning_rate
         self.momentum = momentum
         self.loss_func = loss_func if loss_func is not None else RMSE()
-        self.layers = []
+        self.layers = layers
 
-        for layer in layers:
-            self._add(layer)
+        for i, layer in enumerate(layers):
+            if i > 0:
+                self.layers[i - 1].is_output = False
+                self.layers[i - 1].next_layer = layer
 
-    def _add(self, layer):
-        """Add a layer to the MLP.
-
-        The layer added last is set as the output layer.
-
-        Arguments:
-            layer: The layer to add to the MLP.
-        """
-        if len(self.layers) > 0:
-            self.layers[-1].is_output = False
-            self.layers[-1].next_layer = layer
-
-            if layer.n_inputs is None:
-                # We need to infer the input shape from the previous layer.
-                layer.n_inputs = self.layers[-1].n_units
+                if layer.n_inputs is None:
+                    # We need to infer the input shape from the previous layer.
+                    layer.n_inputs = self.layers[i - 1].n_units
+                else:
+                    assert layer.n_inputs == self.layers[i - 1].n_units, \
+                        "The number of inputs for layer %d does not match the number of units in the previous layer " \
+                        "(%d != %d)." % (len(self.layers), layer.n_inputs, self.layers[i - 1].n_units)
             else:
-                assert layer.n_inputs == self.layers[-1].n_units, \
-                    "The number of inputs for layer %d does not match the number of units in the previous layer " \
-                    "(%d != %d)." % (len(self.layers), layer.n_inputs, self.layers[-1].n_units)
-        else:
-            assert layer.n_inputs is not None, "The number of inputs for the first layer must be explicitly specified."
+                assert layer.n_inputs is not None, "The number of inputs for the first layer must be explicitly specified."
 
-        layer.network = self
-        layer.is_output = True
-        layer.initialise_weights()
-
-        self.layers.append(layer)
+            layer.network = self
+            layer.is_output = True
+            layer.initialise_weights()
 
     def _forward(self, X):
         """Perform a forward pass of the MLP.
@@ -304,7 +191,7 @@ class MLPRegressor:
                 print('Stopping early - loss has stopped improving.')
                 break
 
-            if epoch_loss < early_stopping_threshold:
+            if early_stopping_threshold > 0 and epoch_loss < early_stopping_threshold:
                 if log_verbosity > 1 and epoch % log_verbosity != 0:
                     print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, loss_history[-1]))
 
@@ -336,6 +223,15 @@ class MLPRegressor:
 
         # Pearson R coefficient.
         return np.mean((y - y.mean()) * (y_pred - y_pred.mean())) / np.sqrt(y.var() * y_pred.var())
+
+    def __str__(self):
+        class_name = self.__class__.__name__
+        layers = '[%s]' % ', '.join([str(layer) for layer in self.layers])
+        lr = str(self.learning_rate)
+        m = str(self.momentum)
+        lf = str(self.loss_func)
+
+        return '%s(layers=%s, learning_rate=%s, momentum=%s, loss_func=%s())' % (class_name, layers, lr, m, lf)
 
 
 class MLPClassifier(MLPRegressor):

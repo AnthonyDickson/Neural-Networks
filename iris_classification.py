@@ -4,8 +4,9 @@ from sklearn import utils
 
 from mlp.activation_functions import Sigmoid, Softmax
 from mlp.datasets import load_iris
+from mlp.layers import DenseLayer
 from mlp.losses import CategoricalCrossEntropy
-from mlp.network import DenseLayer, MLPClassifier
+from mlp.network import MLPClassifier
 
 if __name__ == '__main__':
     np.random.seed(42)

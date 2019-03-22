@@ -34,6 +34,9 @@ class Activation:
         """
         raise NotImplementedError
 
+    def __str__(self):
+        return self.__class__.__name__
+
 
 class Identity(Activation):
     """The identity function."""

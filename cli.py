@@ -5,7 +5,8 @@ import numpy as np
 from sklearn import utils
 
 from mlp.activation_functions import Sigmoid, Identity
-from mlp.network import MLPRegressor, DenseLayer
+from mlp.layers import DenseLayer
+from mlp.network import MLPRegressor
 
 
 class ParamSet:

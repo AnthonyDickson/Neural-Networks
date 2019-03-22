@@ -4,7 +4,8 @@ from sklearn import utils
 
 from mlp.activation_functions import Identity, ReLU
 from mlp.datasets import load_XOR
-from mlp.network import DenseLayer, MLPRegressor
+from mlp.layers import DenseLayer
+from mlp.network import MLPRegressor
 
 if __name__ == '__main__':
     np.random.seed(42)
