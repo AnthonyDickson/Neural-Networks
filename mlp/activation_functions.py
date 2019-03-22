@@ -1,5 +1,8 @@
 """This module implements a few activation functions that are used in neural
 networks.
+
+The functions are called using the `__call__(X)` method, and the derivative of an activation function is given by the
+`derivative(Y)` method.
 """
 
 import numpy as np

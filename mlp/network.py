@@ -4,12 +4,16 @@ functionality.
 The main classes are:
 - MLPRegressor: A MLP for regression
 - MLPClassifier: A MLP for classification
-- DenseLayer: A fully connected neural network layer.
+
+The MLP classes follow a design that is similar to a mix of the Keras API and the scikit-learn estimator API.
 """
+import json
 
 import numpy as np
 from sklearn import utils
 
+import mlp.layers
+import mlp.losses
 from mlp.losses import RMSE, CategoricalCrossEntropy, BinaryCrossEntropy
 
 
@@ -62,9 +66,7 @@ def _generate_minibatches(X, y, batch_size=32, shuffle=False):
         ix += batch_size
 
 
-class MLPRegressor:
-    """A MLP for regression tasks."""
-
+class MLP:
     def __init__(self, layers=None, learning_rate=1.0, momentum=0.9, loss_func=None):
         """Create a MLP.
 
@@ -208,7 +210,7 @@ class MLPRegressor:
 
         Returns: The predicted targets for the given feature data.
         """
-        return self._forward(X)
+        raise NotImplementedError
 
     def score(self, X, y):
         """Calculate the score for given feature and target data sets.
@@ -219,10 +221,7 @@ class MLPRegressor:
 
         Returns: The score of the MLP for the given data sets.
         """
-        y_pred = self.predict(X)
-
-        # Pearson R coefficient.
-        return np.mean((y - y.mean()) * (y_pred - y_pred.mean())) / np.sqrt(y.var() * y_pred.var())
+        raise NotImplementedError
 
     def __str__(self):
         class_name = self.__class__.__name__
@@ -232,6 +231,84 @@ class MLPRegressor:
         lf = str(self.loss_func)
 
         return '%s(layers=%s, learning_rate=%s, momentum=%s, loss_func=%s())' % (class_name, layers, lr, m, lf)
+
+    def json(self):
+        """Create a JSON representation of a layer.
+
+        Returns: a JSON-convertable dictionary containing the parameters that describe the layer instance.
+        """
+        return dict(
+            clf_type=self.__class__.__name__,
+            layers=[layer.json() for layer in self.layers],
+            learning_rate=self.learning_rate,
+            momentum=self.momentum,
+            loss_func=str(self.loss_func)
+        )
+
+    def save(self, filename):
+        """Save a MLP to disk.
+
+        Arguments:
+            filename: The path + filename indicating where to save the MLP.
+        """
+        with open(filename, 'w') as file:
+            json.dump(self.json(), file)
+
+    @staticmethod
+    def from_json(json_dict):
+        """Create a MLP object from JSON.
+
+        Arguments:
+            json_dict: The JSON dictionary from which to create the MLP object.
+
+        Returns: The instantiated MLP object.
+        """
+        module = __import__(MLP.__module__)
+        class_ = getattr(module.network, json_dict['clf_type'])
+        layers = []
+
+        for layer_params in json_dict['layers']:
+            layer_class = getattr(mlp.layers, layer_params['layer_type'])
+            layers.append(layer_class.from_json(layer_params))
+
+        return class_(layers=layers,
+                      learning_rate=json_dict['learning_rate'],
+                      momentum=json_dict['momentum'],
+                      loss_func=getattr(mlp.losses, json_dict['loss_func'])())
+
+    @staticmethod
+    def load(filename):
+        """Load a MLP from disk.
+
+        Arguments:
+            filename: The path + filename indicating where to load the MLP from.
+
+        Returns: A new MLP object.
+        """
+        with open(filename, 'r') as file:
+            json_dict = json.load(file)
+
+        return MLPRegressor.from_json(json_dict)
+
+
+class MLPRegressor(MLP):
+    """A MLP for regression tasks."""
+
+    def predict(self, X):
+        """Predict the targets for a given feature data set.
+
+        Arguments:
+            X: The feature data set.
+
+        Returns: The predicted targets for the given feature data.
+        """
+        return self._forward(X)
+
+    def score(self, X, y):
+        y_pred = self.predict(X)
+
+        # Pearson R coefficient.
+        return np.mean((y - y.mean()) * (y_pred - y_pred.mean())) / np.sqrt(y.var() * y_pred.var())
 
 
 class MLPClassifier(MLPRegressor):
@@ -270,13 +347,6 @@ class MLPClassifier(MLPRegressor):
         return self._forward(X)
 
     def predict(self, X):
-        """Predict the targets for a given feature data set.
-
-        Arguments:
-            X: The feature data set.
-
-        Returns: The predicted targets for the given feature data.
-        """
         if isinstance(self.loss_func, BinaryCrossEntropy):
             y_pred = self.predict_proba(X)
 
