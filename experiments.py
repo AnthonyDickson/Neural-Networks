@@ -28,43 +28,52 @@ class ParamSet:
 
 
 class ResultSet:
-    def __init__(self, run_id, scores, scores_mean, scores_std, params, loss_histories, clf):
+    def __init__(self, run_id, clf, params, train_loss, train_scores, val_loss, val_scores):
         if isinstance(params['clf_type'], type):
             params['clf_type'] = params['clf_type'].__name__
 
         self.run_id = run_id
-        self.scores = scores
-        self.scores_mean = scores_mean
-        self.scores_std = scores_std
-        self.params = params
-        self.loss_histories = loss_histories
         self.clf = clf
-
-        if isinstance(self.scores_mean, np.ma.core.MaskedConstant):
-            self.scores_mean = float('-inf')
-
-        if isinstance(self.scores_std, np.ma.core.MaskedConstant):
-            self.scores_std = float('-inf')
+        self.params = params
+        self.train_loss = train_loss
+        self.train_scores = train_scores
+        self.val_loss = val_loss
+        self.val_scores = val_scores
 
     def __copy__(self):
-        return ResultSet(self.run_id, self.scores, self.scores_mean, self.scores_std, self.params, self.loss_histories,
-                         self.clf)
+        return ResultSet(self.run_id, self.clf, self.params,
+                         self.train_loss, self.train_scores, self.val_loss, self.val_scores)
 
     def json(self):
-        # TODO: Fix bug with his line. 'ufunc `isinfinite` not supported for the input types.'
-        mean_loss_history = np.ma.masked_invalid(self.loss_histories).mean(axis=1).tolist()
+        masked_train_loss = np.ma.masked_invalid(self.train_loss)
+        masked_train_scores = np.ma.masked_invalid(self.train_scores)
+        masked_val_loss = np.ma.masked_invalid(self.val_loss)
+        masked_val_scores = np.ma.masked_invalid(self.val_scores)
 
-        if isinstance(mean_loss_history, np.ma.core.MaskedConstant):
-            mean_loss_history = np.zeros_like(self.loss_histories)
-            mean_loss_history.fill(float('-nan'))  # would be NaN anyway so doesn't matter what this is set to
+        train_loss_mean = masked_train_loss.mean().tolist()
+        train_scores_mean = masked_train_scores.mean().tolist()
+        val_loss_mean = masked_val_loss.mean().tolist()
+        val_scores_mean = masked_val_scores.mean().tolist()
+
+        train_loss_std = masked_train_loss.std().tolist()
+        train_scores_std = masked_train_scores.std().tolist()
+        val_loss_std = masked_val_loss.std().tolist()
+        val_scores_std = masked_val_scores.std().tolist()
+
+        if isinstance(val_loss_mean, np.ma.core.MaskedConstant):
+            val_loss_mean.fill(float('-inf'))  # would be NaN anyway so doesn't matter what this is set to.
 
         return {
             'run_id': self.run_id,
-            'scores': self.scores,
-            'scores_mean': self.scores_mean,
-            'scores_std': self.scores_std,
             'params': self.params,
-            'mean_loss_history': mean_loss_history
+            'train_loss_mean': train_loss_mean,
+            'train_scores_mean': train_scores_mean,
+            'val_loss_mean': val_loss_mean,
+            'val_scores_mean': val_scores_mean,
+            'train_loss_std': train_loss_std,
+            'train_scores_std': train_scores_std,
+            'val_loss_std': val_loss_std,
+            'val_scores_std': val_scores_std
         }
 
     def save(self, path, subdir=None):
@@ -77,7 +86,10 @@ class ResultSet:
         with open(run_path + 'statistics.json', 'w') as file:
             json.dump(self.json(), file)
 
-        np.save(run_path + 'loss_history', self.loss_histories)
+        np.save(run_path + 'train_loss', self.train_loss)
+        np.save(run_path + 'train_scores', self.train_scores)
+        np.save(run_path + 'val_loss', self.val_loss)
+        np.save(run_path + 'val_scores', self.val_scores)
         self.clf.save(run_path + 'model.json')
         self.clf.save_weights(run_path + 'weights')
 
@@ -99,12 +111,12 @@ def evaluation_step(clf, batch_size, shuffle_batches, X_train, X_val, y_train, y
     train_loss, train_score, val_loss, val_score = clf.fit(X_train, y_train, val_set=(X_val, y_val),
                                                            n_epochs=n_epochs, batch_size=batch_size,
                                                            shuffle_batches=shuffle_batches, early_stopping=es,
-                                                           log_verbosity=100)
+                                                           log_verbosity=0)
 
-    pad(train_loss, n_epochs)
-    pad(train_score, n_epochs)
-    pad(val_loss, n_epochs)
-    pad(val_score, n_epochs)
+    train_loss = pad(train_loss, n_epochs)
+    train_score = pad(train_score, n_epochs)
+    val_loss = pad(val_loss, n_epochs)
+    val_score = pad(val_score, n_epochs)
 
     return clf.score(X_val, y_val), train_loss, train_score, val_loss, val_score
 
@@ -156,11 +168,6 @@ if __name__ == '__main__':
     print('Grid Search running with %d job(s).' % n_jobs)
 
     for i, param_set in enumerate(param_grid):
-        scores = []
-        loss_histories = []
-        clf = None
-        best_param_set_clf = None
-
         md5 = hashlib.md5(str(time()).encode('utf-8'))
         run_id = md5.hexdigest()
 
@@ -191,12 +198,13 @@ if __name__ == '__main__':
                 loss_func = CategoricalCrossEntropy()
 
         batches = []
+        clf = None
 
         if param_set['dataset'] == 'iris':
             cv = RepeatedStratifiedKFold(n_splits=2, n_repeats=n_trials)
 
-            for train_index, test_index in cv.split(X, y_multiclass):
-                X_train, X_test, y_train, y_test = X[train_index], X[test_index], y[train_index], y[test_index]
+            for train_index, val_index in cv.split(X, y_multiclass):
+                X_train, X_val, y_train, y_val = X[train_index], X[val_index], y[train_index], y[val_index]
 
                 clf = param_set['clf_type']([
                     DenseLayer(hidden_layer_size, n_inputs=X.shape[1], activation_func=Sigmoid()),
@@ -204,7 +212,7 @@ if __name__ == '__main__':
                 ], learning_rate=param_set['learning_rate'], momentum=param_set['momentum'])
 
                 batches.append((clf, param_set['batch_size'], param_set['shuffle_batches'],
-                                X_train, X_test, y_train, y_test))
+                                X_train, X_val, y_train, y_val))
         else:
             for n in range(n_trials):
                 clf = param_set['clf_type']([
@@ -219,22 +227,24 @@ if __name__ == '__main__':
             p_results = p.starmap(evaluation_step, batches)
 
         best_param_set_score = -2 ** 32 - 1
+        best_param_set_clf = None
+        train_loss_history = []
+        train_scores = []
+        val_loss_history = []
+        val_scores = []
 
-        # TODO: Record training and testing sets of score and loss history.
-        for batch_i, (score, _, _, test_loss_history, _) in enumerate(p_results):
-            if score > best_param_set_score and score != float('nan') and score != float('inf'):
+        for batch_i, (score, train_loss, train_score, val_loss, val_score) in enumerate(p_results):
+            if score > best_param_set_score and score != float('nan') and abs(score) != float('inf'):
                 best_param_set_score = score
                 best_param_set_clf = batches[batch_i][0]
 
-            scores.append(score)
-            loss_histories.append(test_loss_history)
+            train_loss_history.append(train_loss)
+            train_scores.append(train_score)
+            val_loss_history.append(val_loss)
+            val_scores.append(val_score)
 
-        masked_scores = np.ma.masked_invalid(scores)
-        scores_mean = masked_scores.mean()
-        scores_std = masked_scores.std()
-
-        results = ResultSet(run_id, scores, scores_mean, scores_std, param_set, loss_histories,
-                            best_param_set_clf if best_param_set_clf else clf)
+        results = ResultSet(run_id, best_param_set_clf if best_param_set_clf else clf, param_set,
+                            train_loss_history, train_scores, val_loss_history, val_scores)
         results.save(results_dir)
 
         if best_param_set_score > best_score and best_param_set_score > -2:

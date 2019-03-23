@@ -216,6 +216,8 @@ class MLP:
             will make training progress be logged less frequently.
 
             shuffle_batches: Whether or not to shuffle the batches each epoch.
+
+        Returns: A 4-tuple of training loss, training score, validation loss, and validation score history data.
         """
         train_loss_history = []
         train_score_history = []
@@ -244,11 +246,8 @@ class MLP:
 
                 self._backward()
 
-            epoch_train_loss = epoch_train_loss_history.mean()
-            train_loss_history.append(epoch_train_loss)
-
-            epoch_train_score = epoch_train_score_history.mean()
-            train_score_history.append(epoch_train_score)
+            train_loss_history.append(epoch_train_loss_history.mean())
+            train_score_history.append(epoch_train_score_history.mean())
 
             if val_set != 0:
                 val_loss_history.append(self.loss_func(y_val, self._forward(X_val)).mean())
