@@ -1,5 +1,7 @@
+import argparse
 import hashlib
 import json
+import multiprocessing
 import os
 from datetime import datetime
 from time import time
@@ -67,15 +69,34 @@ class ResultSet:
         self.clf.save_weights(run_path + 'weights')
 
 
+def evaluation_step(clf, batch_size, X_train, X_test, y_train, y_test):
+    loss_history = clf.fit(X_train, y_train,
+                           n_epochs=10000, batch_size=batch_size,
+                           log_verbosity=0, early_stopping_threshold=-1)
+
+    return clf.score(X_test, y_test), loss_history
+
+
 # TODO: Make params such as n_trails configurable via command line.
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('--data-dir', type=str, default='data/', help='Where the data sets are located.')
+    parser.add_argument('--results-dir', type=str, default='results/', help='Where to save the results to.')
+    parser.add_argument('--n-trials', type=int, default=20, help='How many times to repeat each configuration.')
+    parser.add_argument('--n-jobs', type=int, default=1, help='How many processors to use.')
+
+    args = parser.parse_args()
+
     np.random.seed(42)
 
-    results_dir = 'results/'
-    base_dir = 'data/'
+    data_dir = args.data_dir
+    results_dir = args.results_dir
+    n_trials = args.n_trials
+    n_jobs = args.n_jobs if args.n_jobs > 0 else len(os.sched_getaffinity(0))
+
     datasets = []
 
-    print('Scanning \'%s\' directory for data sets...' % base_dir)
+    print('Scanning \'%s\' directory for data sets...' % data_dir)
 
     try:
         _, datasets, _ = next(os.walk('data'))
@@ -85,25 +106,22 @@ if __name__ == '__main__':
         print('\'data\' directory not found.')
         exit(1)
 
-    param_dict = dict(
+    param_grid = ParameterGrid(dict(
         dataset=datasets,
         clf_type=[MLPRegressor, MLPClassifier],
         learning_rate=[1e0, 1e-1, 1e-2, 1e-3],
         momentum=[0.99, 0.9, 0.1, 0.01, 0],
         batch_size=[1, 16, 32, -1]
-    )
+    ))
 
-    param_grid = ParameterGrid(param_dict)
-
-    best_score = -2  # -2 since the lowest possible score is -1 (from Pearson's R coefficient).
+    best_score = -2 ** 32 - 1
     best_results = None
-
-    n_trials = 20
     n_param_sets = len(param_grid)
     total_steps = n_param_sets * n_trials
 
     start = datetime.now()
     print('Grid Search Started at: %s' % start)
+    print('Grid Search running with %d job(s).' % n_jobs)
 
     for i, param_set in enumerate(param_grid):
         scores = []
@@ -115,9 +133,9 @@ if __name__ == '__main__':
         run_id = md5.hexdigest()
 
         dataset = param_set['dataset']
-        X = np.genfromtxt(base_dir + dataset + '/in.txt')
-        y = np.genfromtxt(base_dir + dataset + '/teach.txt')
-        raw_params = np.genfromtxt(base_dir + dataset + '/params.txt')
+        X = np.genfromtxt(data_dir + dataset + '/in.txt')
+        y = np.genfromtxt(data_dir + dataset + '/teach.txt')
+        raw_params = np.genfromtxt(data_dir + dataset + '/params.txt')
 
         if len(y.shape) == 1:
             y = y.reshape(-1, 1)
@@ -141,6 +159,8 @@ if __name__ == '__main__':
         else:
             cv = None
 
+        batches = []
+
         for n in range(n_trials):
             if cv:
                 train_index, test_index = cv.split(X, y)
@@ -153,19 +173,20 @@ if __name__ == '__main__':
                 DenseLayer(output_layer_size, activation_func=output_layer_activation_func)
             ], learning_rate=param_set['learning_rate'], momentum=param_set['momentum'])
 
-            loss_history = clf.fit(X_train, y_train,
-                                   n_epochs=10000, batch_size=param_set['batch_size'],
-                                   log_verbosity=0, early_stopping_threshold=-1)
-            scores.append(clf.score(X_test, y_test))
+            batches.append((clf, param_set['batch_size'], X_train, X_test, y_train, y_test))
+
+        with multiprocessing.Pool(n_jobs) as p:
+            p_results = p.starmap(evaluation_step, batches)
+
+        best_param_set_score = -2 ** 32 - 1
+
+        for batch_i, (score, loss_history) in enumerate(p_results):
+            if score > best_param_set_score and score != float('nan') and score != float('inf'):
+                best_param_set_score = score
+                best_param_set_clf = batches[batch_i][0]
+
+            scores.append(score)
             loss_histories.append(loss_history)
-
-            if scores[n] >= max(scores) and scores[n] != float('nan') and scores[n] != float('inf'):
-                best_param_set_clf = clf
-
-            curr_step = i * n_trials + (n + 1)
-            print('\rProgress: %d/%d (%05.2f%%) - Elapsed time: %s'
-                  % (curr_step, total_steps, 100 * curr_step / total_steps, datetime.now() - start),
-                  end='')
 
         scores_mean = np.mean(scores)
         scores_std = np.std(scores)
@@ -174,11 +195,14 @@ if __name__ == '__main__':
                             best_param_set_clf if best_param_set_clf else clf)
         results.save(results_dir)
 
-        max_score = max(scores)
-
-        if max_score > best_score and scores_mean != float('nan') and scores_mean != float('inf'):
-            best_score = max_score
+        if best_param_set_score > best_score and best_param_set_score > -2:
+            best_score = best_param_set_score
             best_results = results.__copy__()
+
+        curr_step = (i + 1) * n_trials
+        print('\rProgress: %d/%d (%05.2f%%) - Elapsed time: %s'
+              % (curr_step, total_steps, 100 * curr_step / total_steps, datetime.now() - start),
+              end='')
 
     best_results.save(results_dir, subdir='best')
     print('\nDone.')
