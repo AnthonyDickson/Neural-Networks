@@ -10,10 +10,11 @@ import numpy as np
 from sklearn import utils
 from sklearn.model_selection import ParameterGrid, RepeatedStratifiedKFold
 
+import mlp
 from mlp.activation_functions import Identity, Sigmoid, Softmax
 from mlp.layers import DenseLayer
 from mlp.losses import BinaryCrossEntropy, CategoricalCrossEntropy, RMSE
-from mlp.network import MLPRegressor, MLPClassifier, EarlyStopping
+from mlp.network import MLPRegressor, EarlyStopping
 
 
 class ParamSet:
@@ -124,6 +125,8 @@ def evaluation_step(clf, batch_size, shuffle_batches, X_train, X_val, y_train, y
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run grid search on various MLP configurations and datasets.')
+    parser.add_argument('config', type=str, help='The configuration file to use for this experiment. '
+                                                 'See `generate_grid_search_cfgs.py`,')
     parser.add_argument('--data-dir', type=str, default='data/', help='Where the data sets are located.')
     parser.add_argument('--results-dir', type=str, default='results/', help='Where to save the results to.')
     parser.add_argument('--n-trials', type=int, default=20, help='How many times to repeat each configuration.')
@@ -150,14 +153,18 @@ if __name__ == '__main__':
         print('\'data\' directory not found.')
         exit(1)
 
-    param_grid = ParameterGrid(dict(
-        batch_size=[1, 2, 4, -1],
-        clf_type=[MLPRegressor, MLPClassifier],
-        dataset=datasets,
-        learning_rate=[1e0, 1e-1, 1e-2, 1e-3],
-        momentum=[0.9, 0.1, 0],
-        shuffle_batches=[False, True]
-    ))
+    with open(args.config, 'r') as f:
+        grid_search_cfg = json.load(f)
+
+        if 'clf_type' in grid_search_cfg:
+            for i, clf_type in enumerate(grid_search_cfg['clf_type']):
+                class_ = getattr(mlp.network, clf_type)
+
+                grid_search_cfg['clf_type'][i] = class_
+
+        print('Loaded configuration file: %s.\n' % args.config)
+
+    param_grid = ParameterGrid(grid_search_cfg)
 
     best_score = -2 ** 32 - 1
     best_results = None
@@ -165,7 +172,7 @@ if __name__ == '__main__':
     total_steps = n_param_sets * n_trials
 
     start = datetime.now()
-    print('Grid Search Started at: %s' % start)
+    print('Grid Search started at: %s' % start)
     print('Grid Search running with %d job(s).' % n_jobs)
 
     for i, param_set in enumerate(param_grid):
