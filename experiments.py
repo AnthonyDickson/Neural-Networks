@@ -12,7 +12,7 @@ from sklearn.model_selection import ParameterGrid, RepeatedStratifiedKFold
 from mlp.activation_functions import Identity, Sigmoid, Softmax
 from mlp.layers import DenseLayer
 from mlp.losses import BinaryCrossEntropy, CategoricalCrossEntropy, RMSE
-from mlp.network import MLPRegressor, MLPClassifier
+from mlp.network import MLPRegressor, MLPClassifier, EarlyStopping
 
 
 class ParamSet:
@@ -41,10 +41,10 @@ class ResultSet:
         self.clf = clf
 
         if isinstance(self.scores_mean, np.ma.core.MaskedConstant):
-            self.scores_mean = float('nan')
+            self.scores_mean = float('-inf')
 
         if isinstance(self.scores_std, np.ma.core.MaskedConstant):
-            self.scores_std = float('nan')
+            self.scores_std = float('-inf')
 
     def __copy__(self):
         return ResultSet(self.run_id, self.scores, self.scores_mean, self.scores_std, self.params, self.loss_histories,
@@ -55,7 +55,8 @@ class ResultSet:
         mean_loss_history = np.ma.masked_invalid(self.loss_histories).mean(axis=1).tolist()
 
         if isinstance(mean_loss_history, np.ma.core.MaskedConstant):
-            mean_loss_history = self.loss_histories  # would be NaN anyway so doesn't matter what this is set to
+            mean_loss_history = np.zeros_like(self.loss_histories)
+            mean_loss_history.fill(float('-nan'))  # would be NaN anyway so doesn't matter what this is set to
 
         return {
             'run_id': self.run_id,
@@ -81,23 +82,31 @@ class ResultSet:
         self.clf.save_weights(run_path + 'weights')
 
 
-def evaluation_step(clf, batch_size, shuffle_batches, X_train, X_test, y_train, y_test):
-    n_epochs = 10000
-    train_loss, train_score, test_loss, test_score = clf.fit(X_train, y_train, X_test, y_test,
-                                                             n_epochs=n_epochs, batch_size=batch_size,
-                                                             shuffle_batches=shuffle_batches,
-                                                             log_verbosity=100, early_stopping_patience=100)
+def pad(a, length, fill_value=float('-inf')):
+    if len(a) == length:
+        return a
 
-    # TODO: Make sure this code actually has an effect (see `a = temp`).
-    for a in [train_loss, train_score, test_loss, test_score]:
-        # Arrays need to be same lengths to aggregate functions (e.g. mean) will not throw an error.
-        temp = np.zeros(n_epochs)
-        temp.fill(float('nan'))
-        min_len = min(n_epochs, len(a))
-        temp[:min_len] = a[:min_len]
-        a = temp
+    temp = np.zeros(length)
+    temp.fill(fill_value)
+    temp[:len(a)] = a
 
-    return clf.score(X_test, y_test), train_loss, train_score, test_loss, test_score
+    return temp
+
+
+def evaluation_step(clf, batch_size, shuffle_batches, X_train, X_val, y_train, y_val, n_epochs=10000):
+    es = EarlyStopping(patience=100)
+
+    train_loss, train_score, val_loss, val_score = clf.fit(X_train, y_train, val_set=(X_val, y_val),
+                                                           n_epochs=n_epochs, batch_size=batch_size,
+                                                           shuffle_batches=shuffle_batches, early_stopping=es,
+                                                           log_verbosity=100)
+
+    pad(train_loss, n_epochs)
+    pad(train_score, n_epochs)
+    pad(val_loss, n_epochs)
+    pad(val_score, n_epochs)
+
+    return clf.score(X_val, y_val), train_loss, train_score, val_loss, val_score
 
 
 if __name__ == '__main__':

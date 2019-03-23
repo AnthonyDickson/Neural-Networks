@@ -13,6 +13,7 @@ import pickle
 
 import numpy as np
 from sklearn import utils
+from sklearn.model_selection import train_test_split
 
 import mlp.layers
 import mlp.losses
@@ -64,6 +65,65 @@ def _generate_minibatches(X, y, batch_size=32, shuffle=False):
         yield batch_i, X[batch_start:batch_end], y[batch_start:batch_end]
 
         ix += batch_size
+
+
+class EarlyStopping:
+    """An object that implements early stopping.
+
+    Training can be stopped early based on the lack of improvement of loss or upon reaching a target loss,
+    """
+
+    def __init__(self, patience=10, min_improvement=1e-5, criterion=2e-2):
+        """
+        Create an EarlyStopping object.
+
+        Arguments:
+            patience: The number of epochs after no improvement in loss is observed which training should be stopped
+            early. If set to any number less than one, early stopping based on the change in loss is disabled.
+
+            min_improvement: The minimum change of loss that is to be considered an improvement.
+
+            criterion: The learning criterion, or the target loss. Training is stopped once the loss is less than the
+            criterion.
+        """
+        self.patience = patience
+        self.min_improvement = min_improvement
+        self.criterion = criterion
+        self.epochs_no_improvement = 0
+        self.min_loss = 2 ** 32 - 1
+        self.reason = ''
+        self.last_loss = 2 ** 32 - 1
+
+    @property
+    def should_stop(self):
+        """Check whether training should stop.
+
+        Returns: True if training should stop, False otherwise.
+        """
+        if self.patience > 0 and self.epochs_no_improvement > self.patience:
+            self.reason = 'loss has stopped improving'
+
+            return True
+        elif self.criterion > 0 and self.last_loss < self.criterion:
+            self.reason = 'reached target error criterion'
+
+            return True
+        else:
+            return False
+
+    def update(self, loss):
+        """Update the state of the early stopping object.
+
+        Arguments:
+            loss: The loss to measure.
+        """
+        self.last_loss = loss
+
+        if self.min_loss - loss > self.min_improvement:
+            self.min_loss = loss
+            self.epochs_no_improvement = 0
+        else:
+            self.epochs_no_improvement += 1
 
 
 class MLP:
@@ -133,51 +193,43 @@ class MLP:
         for layer in reversed(self.layers):
             error_grad = layer.backward(error_grad)
 
-    # TODO: Refactor X_test, y_test into X_val and y_val.
-    # TODO: Merge the X_test and y_test arguments into one and also allow split ratios or number of validation data
-    #  points to be specified.
-    def fit(self, X_train, y_train, X_test=None, y_test=None, n_epochs=100, batch_size=-1, early_stopping_patience=-1,
-            early_stopping_min_improvement=1e-5, early_stopping_threshold=1e-2,
-            log_verbosity=1, shuffle_batches=True):
+    def fit(self, X, y, val_set=0.0, n_epochs=100, batch_size=-1, shuffle_batches=True,
+            early_stopping=None, log_verbosity=1):
         """Fit/train the MLP on the given data sets.
 
         Arguments:
-            X_train: The feature data set for training the MLP on.
-            y_train: The target data set for training the MLP on.
-            X_test: A feature data set to test the MLP on. If set to None the training set is used.
-            y_test: The target data set to test the MLP on. If set to None the training set is used.
+            X: The feature data set for training the MLP on.
+            y: The target data set for training the MLP on.
+            val_set: The data set to be used for validation. This can be an integer indicating how many samples from the
+            training sets to use for validation; or it can be a ratio indicating what proportion of the training data to
+            use for validation; or it can be a tuple containing the X and y validation sets.
+
             n_epochs: How many epochs to train the MLP for.
 
             batch_size: The size of the batches to use for training.
             If this is set to -1, batch SGD is performed; if this is set to 1,
             standard SGD is performed; otherwise mini-batch SGD is performed.
 
-            early_stopping_patience: The number of epochs after no improvement
-            in loss is observed which training should be stopped early. If set
-            to any number less than one, early stopping based on the change in
-            loss is disabled.
-
-            early_stopping_min_improvement: The minimum change of loss that is
-            to be considered an improvement.
-
-            early_stopping_threshold: The learning criterion, or the target
-            loss. Training is stopped once the loss is less than the criterion.
+            early_stopping: See `EarlyStopping`. If set to None then early stopping is not used.
 
             log_verbosity: How often to log training progress. Large values
             will make training progress be logged less frequently.
 
             shuffle_batches: Whether or not to shuffle the batches each epoch.
         """
-        min_loss = 2 ** 31 - 1
-        epochs_no_improvement = 0
         train_loss_history = []
         train_score_history = []
-        test_loss_history = []
-        test_score_history = []
+        val_loss_history = []
+        val_score_history = []
 
-        if X_test is None or y_test is None:
-            X_test = X_train
-            y_test = y_train
+        if type(val_set) is int or type(val_set) is float:
+            X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_set, stratify=y)
+        elif type(val_set) is tuple:
+            X_train = X
+            y_train = y
+            X_val, y_val = val_set
+        else:
+            raise ValueError('Invalid type `%s` for val_set, expected int, float or tuple.' % type(val_set))
 
         for epoch in range(n_epochs):
             epoch_train_loss_history = np.array([])
@@ -198,38 +250,26 @@ class MLP:
             epoch_train_score = epoch_train_score_history.mean()
             train_score_history.append(epoch_train_score)
 
-            test_loss_history.append(self.loss_func(y_test, self._forward(X_test)).mean())
-            test_score_history.append(self.score(X_test, y_test))
+            if val_set != 0:
+                val_loss_history.append(self.loss_func(y_val, self._forward(X_val)).mean())
+                val_score_history.append(self.score(X_val, y_val))
 
             if log_verbosity > 0 and epoch % log_verbosity == 0:
-                print('Epoch %d of %d - Loss: %.4f - Score: %.4f - Test Loss: %.4f - Train Score: %.4f'
+                print('epoch %d of %d - loss: %.4f - score: %.4f - val_loss: %.4f - val_score: %.4f'
                       % (epoch + 1, n_epochs, train_loss_history[-1], train_score_history[-1],
-                         test_loss_history[-1], test_score_history[-1]))
+                         val_loss_history[-1], val_score_history[-1]))
 
-            # TODO: Refactor early stopping stuff elsewhere?
-            if min_loss - epoch_train_loss > early_stopping_min_improvement:
-                min_loss = epoch_train_loss
-                epochs_no_improvement = 0
-            else:
-                epochs_no_improvement += 1
+            if early_stopping:
+                early_stopping.update(val_loss_history[-1] if val_set != 0 else train_loss_history[-1])
 
-            if early_stopping_patience > 0 and epochs_no_improvement > early_stopping_patience:
-                if log_verbosity > 1 and epoch % log_verbosity != 0:
-                    print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, train_loss_history[-1]))
+                if early_stopping.should_stop:
+                    if log_verbosity > 0:
+                        print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, train_loss_history[-1]))
+                        print('Stopping early - %s.' % early_stopping.reason)
 
-                    print('Stopping early - loss has stopped improving.')
+                    break
 
-                break
-
-            if early_stopping_threshold > 0 and epoch_train_loss < early_stopping_threshold:
-                if log_verbosity > 1 and epoch % log_verbosity != 0:
-                    print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, train_loss_history[-1]))
-
-                    print('Stopping early - reached target error criterion.')
-
-                break
-
-        return train_loss_history, train_score_history, test_loss_history, test_score_history
+        return train_loss_history, train_score_history, val_loss_history, val_score_history
 
     def predict(self, X):
         """Predict the targets for a given feature data set.
