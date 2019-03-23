@@ -7,6 +7,7 @@ from datetime import datetime
 from time import time
 
 import numpy as np
+from sklearn import utils
 from sklearn.model_selection import ParameterGrid, RepeatedStratifiedKFold
 
 from mlp.activation_functions import Identity, Sigmoid, Softmax
@@ -122,7 +123,7 @@ def evaluation_step(clf, batch_size, shuffle_batches, X_train, X_val, y_train, y
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser = argparse.ArgumentParser(description='Run grid search on various MLP configurations and datasets.')
     parser.add_argument('--data-dir', type=str, default='data/', help='Where the data sets are located.')
     parser.add_argument('--results-dir', type=str, default='results/', help='Where to save the results to.')
     parser.add_argument('--n-trials', type=int, default=20, help='How many times to repeat each configuration.')
@@ -182,6 +183,8 @@ if __name__ == '__main__':
         else:
             y_multiclass = y.argmax(axis=1)
             y_multiclass = y_multiclass.reshape(-1, 1)
+
+        utils.shuffle(X, y, y_multiclass)
 
         hidden_layer_size = ParamSet(raw_params).hidden_layer_size
         output_layer_size = y.shape[1]
@@ -245,7 +248,9 @@ if __name__ == '__main__':
 
         results = ResultSet(run_id, best_param_set_clf if best_param_set_clf else clf, param_set,
                             train_loss_history, train_scores, val_loss_history, val_scores)
-        results.save(results_dir)
+
+        subdir = '/'.join(['%s=%s' % (key, str(value)) for key, value in zip(param_set.keys(), param_set.values())])
+        results.save(results_dir, subdir)
 
         if best_param_set_score > best_score and best_param_set_score > -2:
             best_score = best_param_set_score
