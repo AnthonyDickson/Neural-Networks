@@ -84,7 +84,7 @@ def evaluation_step(clf, batch_size, X_train, X_test, y_train, y_test):
     n_epochs = 10000
     loss_history = clf.fit(X_train, y_train,
                            n_epochs=n_epochs, batch_size=batch_size,
-                           log_verbosity=0)
+                           log_verbosity=0, early_stopping_patience=100)
 
     # Arrays need to be same lengths to aggregate functions (e.g. mean) will not throw an error.
     rloss_history = np.zeros(n_epochs)
