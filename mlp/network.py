@@ -133,15 +133,21 @@ class MLP:
         for layer in reversed(self.layers):
             error_grad = layer.backward(error_grad)
 
-    def fit(self, X, y, n_epochs=100, batch_size=-1, early_stopping_patience=-1,
+    # TODO: Refactor X_test, y_test into X_val and y_val.
+    # TODO: Merge the X_test and y_test arguments into one and also allow split ratios or number of validation data
+    #  points to be specified.
+    def fit(self, X_train, y_train, X_test=None, y_test=None, n_epochs=100, batch_size=-1, early_stopping_patience=-1,
             early_stopping_min_improvement=1e-5, early_stopping_threshold=1e-2,
-            log_verbosity=1):
+            log_verbosity=1, shuffle_batches=True):
         """Fit/train the MLP on the given data sets.
 
         Arguments:
-            X: The feature data set.
-            y: The target data set.
+            X_train: The feature data set for training the MLP on.
+            y_train: The target data set for training the MLP on.
+            X_test: A feature data set to test the MLP on. If set to None the training set is used.
+            y_test: The target data set to test the MLP on. If set to None the training set is used.
             n_epochs: How many epochs to train the MLP for.
+
             batch_size: The size of the batches to use for training.
             If this is set to -1, batch SGD is performed; if this is set to 1,
             standard SGD is performed; otherwise mini-batch SGD is performed.
@@ -159,50 +165,71 @@ class MLP:
 
             log_verbosity: How often to log training progress. Large values
             will make training progress be logged less frequently.
+
+            shuffle_batches: Whether or not to shuffle the batches each epoch.
         """
         min_loss = 2 ** 31 - 1
         epochs_no_improvement = 0
-        loss_history = []
+        train_loss_history = []
+        train_score_history = []
+        test_loss_history = []
+        test_score_history = []
+
+        if X_test is None or y_test is None:
+            X_test = X_train
+            y_test = y_train
 
         for epoch in range(n_epochs):
-            epoch_loss_history = np.array([])
+            epoch_train_loss_history = np.array([])
+            epoch_train_score_history = np.array([])
 
-            for _, X_batch, y_batch in _generate_minibatches(X, y, batch_size):
+            for _, X_batch, y_batch in _generate_minibatches(X_train, y_train, batch_size, shuffle=shuffle_batches):
                 target_pred = self._forward(X_batch)
                 loss = self.loss_func(y_batch, target_pred)
-                epoch_loss_history = np.append(epoch_loss_history, loss)
+                epoch_train_loss_history = np.append(epoch_train_loss_history, loss)
+                score = self.score(X_batch, y_batch)
+                epoch_train_score_history = np.append(epoch_train_score_history, score)
 
                 self._backward()
 
-            epoch_loss = epoch_loss_history.mean()  # / self.layers[-1].shape[-1]
-            loss_history.append(epoch_loss)
+            epoch_train_loss = epoch_train_loss_history.mean()
+            train_loss_history.append(epoch_train_loss)
+
+            epoch_train_score = epoch_train_score_history.mean()
+            train_score_history.append(epoch_train_score)
+
+            test_loss_history.append(self.loss_func(y_test, self._forward(X_test)).mean())
+            test_score_history.append(self.score(X_test, y_test))
 
             if log_verbosity > 0 and epoch % log_verbosity == 0:
-                print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, loss_history[-1]))
+                print('Epoch %d of %d - Loss: %.4f - Score: %.4f - Test Loss: %.4f - Train Score: %.4f'
+                      % (epoch + 1, n_epochs, train_loss_history[-1], train_score_history[-1],
+                         test_loss_history[-1], test_score_history[-1]))
 
-            if min_loss - epoch_loss > early_stopping_min_improvement:
-                min_loss = epoch_loss
+            # TODO: Refactor early stopping stuff elsewhere?
+            if min_loss - epoch_train_loss > early_stopping_min_improvement:
+                min_loss = epoch_train_loss
                 epochs_no_improvement = 0
             else:
                 epochs_no_improvement += 1
 
             if early_stopping_patience > 0 and epochs_no_improvement > early_stopping_patience:
                 if log_verbosity > 1 and epoch % log_verbosity != 0:
-                    print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, loss_history[-1]))
+                    print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, train_loss_history[-1]))
 
                     print('Stopping early - loss has stopped improving.')
 
                 break
 
-            if early_stopping_threshold > 0 and epoch_loss < early_stopping_threshold:
+            if early_stopping_threshold > 0 and epoch_train_loss < early_stopping_threshold:
                 if log_verbosity > 1 and epoch % log_verbosity != 0:
-                    print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, loss_history[-1]))
+                    print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, train_loss_history[-1]))
 
                     print('Stopping early - reached target error criterion.')
 
                 break
 
-        return loss_history
+        return train_loss_history, train_score_history, test_loss_history, test_score_history
 
     def predict(self, X):
         """Predict the targets for a given feature data set.

@@ -97,10 +97,10 @@ class TrainNetworkCommand(Command):
         """ X, y, n_epochs=100, batch_size=-1, early_stopping_patience=-1,
             early_stopping_min_improvement=1e-5, early_stopping_threshold=1e-2,
             log_verbosity=1)"""
-        loss_history = network.fit(X, y, n_epochs, batch_size,
-                                   early_stopping_patience,
-                                   early_stopping_threshold=early_stopping_threshold,
-                                   log_verbosity=log_verbosity)
+        _, _, loss_history, _ = network.fit(X, y, n_epochs=n_epochs, batch_size=batch_size,
+                                            early_stopping_patience=early_stopping_patience,
+                                            early_stopping_threshold=early_stopping_threshold,
+                                            log_verbosity=log_verbosity)
 
         return loss_history
 

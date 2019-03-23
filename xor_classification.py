@@ -16,10 +16,11 @@ if __name__ == '__main__':
 
     mlp = MLPClassifier([DenseLayer(2, n_inputs=2, activation_func=Sigmoid()),
                          DenseLayer(1, activation_func=Sigmoid())],
-                        learning_rate=0.3,
+                        learning_rate=0.1,
                         loss_func=BinaryCrossEntropy())
 
-    loss_history = mlp.fit(X, y, n_epochs=10000, batch_size=1, early_stopping_patience=100, log_verbosity=100)
+    _, _, loss_history, _ = mlp.fit(X, y, n_epochs=10000, batch_size=1, early_stopping_patience=100, log_verbosity=100,
+                                    shuffle_batches=True)
     print("Targets: %s - Predictions: %s" % (y.ravel(), mlp.predict(X).ravel()))
     print("Score: %.4f" % mlp.score(X, y))
 

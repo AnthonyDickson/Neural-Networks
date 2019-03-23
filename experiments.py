@@ -51,6 +51,7 @@ class ResultSet:
                          self.clf)
 
     def json(self):
+        # TODO: Fix bug with his line. 'ufunc `isinfinite` not supported for the input types.'
         mean_loss_history = np.ma.masked_invalid(self.loss_histories).mean(axis=1).tolist()
 
         if isinstance(mean_loss_history, np.ma.core.MaskedConstant):
@@ -80,19 +81,23 @@ class ResultSet:
         self.clf.save_weights(run_path + 'weights')
 
 
-def evaluation_step(clf, batch_size, X_train, X_test, y_train, y_test):
+def evaluation_step(clf, batch_size, shuffle_batches, X_train, X_test, y_train, y_test):
     n_epochs = 10000
-    loss_history = clf.fit(X_train, y_train,
-                           n_epochs=n_epochs, batch_size=batch_size,
-                           log_verbosity=0, early_stopping_patience=100)
+    train_loss, train_score, test_loss, test_score = clf.fit(X_train, y_train, X_test, y_test,
+                                                             n_epochs=n_epochs, batch_size=batch_size,
+                                                             shuffle_batches=shuffle_batches,
+                                                             log_verbosity=100, early_stopping_patience=100)
 
-    # Arrays need to be same lengths to aggregate functions (e.g. mean) will not throw an error.
-    rloss_history = np.zeros(n_epochs)
-    rloss_history.fill(float('nan'))
-    min_len = min(n_epochs, len(loss_history))
-    rloss_history[:min_len] = loss_history[:min_len]
+    # TODO: Make sure this code actually has an effect (see `a = temp`).
+    for a in [train_loss, train_score, test_loss, test_score]:
+        # Arrays need to be same lengths to aggregate functions (e.g. mean) will not throw an error.
+        temp = np.zeros(n_epochs)
+        temp.fill(float('nan'))
+        min_len = min(n_epochs, len(a))
+        temp[:min_len] = a[:min_len]
+        a = temp
 
-    return clf.score(X_test, y_test), rloss_history
+    return clf.score(X_test, y_test), train_loss, train_score, test_loss, test_score
 
 
 if __name__ == '__main__':
@@ -124,11 +129,12 @@ if __name__ == '__main__':
         exit(1)
 
     param_grid = ParameterGrid(dict(
-        dataset=datasets,
+        batch_size=[1, 2, 4, -1],
         clf_type=[MLPRegressor, MLPClassifier],
+        dataset=datasets,
         learning_rate=[1e0, 1e-1, 1e-2, 1e-3],
-        momentum=[0.99, 0.9, 0.1, 0.01, 0],
-        batch_size=[1, 16, 32, -1]
+        momentum=[0.9, 0.1, 0],
+        shuffle_batches=[False, True]
     ))
 
     best_score = -2 ** 32 - 1
@@ -188,7 +194,8 @@ if __name__ == '__main__':
                     DenseLayer(output_layer_size, activation_func=output_layer_activation_func)
                 ], learning_rate=param_set['learning_rate'], momentum=param_set['momentum'])
 
-                batches.append((clf, param_set['batch_size'], X_train, X_test, y_train, y_test))
+                batches.append((clf, param_set['batch_size'], param_set['shuffle_batches'],
+                                X_train, X_test, y_train, y_test))
         else:
             for n in range(n_trials):
                 clf = param_set['clf_type']([
@@ -196,20 +203,22 @@ if __name__ == '__main__':
                     DenseLayer(output_layer_size, activation_func=output_layer_activation_func)
                 ], learning_rate=param_set['learning_rate'], momentum=param_set['momentum'])
 
-                batches.append((clf, param_set['batch_size'], X, X, y, y))
+                batches.append((clf, param_set['batch_size'], param_set['shuffle_batches'],
+                                X, X, y, y))
 
         with multiprocessing.Pool(n_jobs) as p:
             p_results = p.starmap(evaluation_step, batches)
 
         best_param_set_score = -2 ** 32 - 1
 
-        for batch_i, (score, loss_history) in enumerate(p_results):
+        # TODO: Record training and testing sets of score and loss history.
+        for batch_i, (score, _, _, test_loss_history, _) in enumerate(p_results):
             if score > best_param_set_score and score != float('nan') and score != float('inf'):
                 best_param_set_score = score
                 best_param_set_clf = batches[batch_i][0]
 
             scores.append(score)
-            loss_histories.append(loss_history)
+            loss_histories.append(test_loss_history)
 
         masked_scores = np.ma.masked_invalid(scores)
         scores_mean = masked_scores.mean()
