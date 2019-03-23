@@ -16,7 +16,7 @@ n_trials=20
 n_jobs=1
 send_email=false
 
-while getopts ':ht:j:' option; do
+while getopts ':ht:j::e' option; do
   case "$option" in
     h) echo "$usage"
        exit
@@ -67,5 +67,5 @@ do
 done
 
 if [[ ${send_email} = true ]]; then
-    echo "Grid Search has finished training." | mail -s ${EMAIL_NOTIFICATION_ADDRESS}
+    echo "" | mail -s "Grid Search has Finished Training." ${EMAIL_NOTIFICATION_ADDRESS}
 fi

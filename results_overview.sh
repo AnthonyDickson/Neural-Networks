@@ -1,2 +1,2 @@
-find results -maxdepth 1 -type d | wc -l | (read n; echo Items: $n) 
-du -h -d 0 results
+find results -type d -links 2 | wc -l | (read n; echo Items: $n) 
+du results -h -d 0 
