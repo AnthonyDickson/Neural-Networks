@@ -7,7 +7,7 @@ from datetime import datetime
 from time import time
 
 import numpy as np
-from sklearn.model_selection import ParameterGrid, StratifiedKFold
+from sklearn.model_selection import ParameterGrid, RepeatedStratifiedKFold
 
 from mlp.activation_functions import Identity, Sigmoid, Softmax
 from mlp.layers import DenseLayer
@@ -40,18 +40,29 @@ class ResultSet:
         self.loss_histories = loss_histories
         self.clf = clf
 
+        if isinstance(self.scores_mean, np.ma.core.MaskedConstant):
+            self.scores_mean = float('nan')
+
+        if isinstance(self.scores_std, np.ma.core.MaskedConstant):
+            self.scores_std = float('nan')
+
     def __copy__(self):
         return ResultSet(self.run_id, self.scores, self.scores_mean, self.scores_std, self.params, self.loss_histories,
                          self.clf)
 
     def json(self):
+        mean_loss_history = np.ma.masked_invalid(self.loss_histories).mean(axis=1).tolist()
+
+        if isinstance(mean_loss_history, np.ma.core.MaskedConstant):
+            mean_loss_history = self.loss_histories  # would be NaN anyway so doesn't matter what this is set to
+
         return {
             'run_id': self.run_id,
             'scores': self.scores,
             'scores_mean': self.scores_mean,
             'scores_std': self.scores_std,
             'params': self.params,
-            'mean_loss_history': np.mean(self.loss_histories, axis=1).tolist()
+            'mean_loss_history': mean_loss_history
         }
 
     def save(self, path, subdir=None):
@@ -70,14 +81,20 @@ class ResultSet:
 
 
 def evaluation_step(clf, batch_size, X_train, X_test, y_train, y_test):
+    n_epochs = 10000
     loss_history = clf.fit(X_train, y_train,
-                           n_epochs=10000, batch_size=batch_size,
-                           log_verbosity=0, early_stopping_threshold=-1)
+                           n_epochs=n_epochs, batch_size=batch_size,
+                           log_verbosity=0)
 
-    return clf.score(X_test, y_test), loss_history
+    # Arrays need to be same lengths to aggregate functions (e.g. mean) will not throw an error.
+    rloss_history = np.zeros(n_epochs)
+    rloss_history.fill(float('nan'))
+    min_len = min(n_epochs, len(loss_history))
+    rloss_history[:min_len] = loss_history[:min_len]
+
+    return clf.score(X_test, y_test), rloss_history
 
 
-# TODO: Make params such as n_trails configurable via command line.
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--data-dir', type=str, default='data/', help='Where the data sets are located.')
@@ -139,6 +156,10 @@ if __name__ == '__main__':
 
         if len(y.shape) == 1:
             y = y.reshape(-1, 1)
+            y_multiclass = y
+        else:
+            y_multiclass = y.argmax(axis=1)
+            y_multiclass = y_multiclass.reshape(-1, 1)
 
         hidden_layer_size = ParamSet(raw_params).hidden_layer_size
         output_layer_size = y.shape[1]
@@ -154,26 +175,28 @@ if __name__ == '__main__':
                 output_layer_activation_func = Softmax()
                 loss_func = CategoricalCrossEntropy()
 
-        if param_set['dataset'] == 'iris':
-            cv = StratifiedKFold(n_splits=2)
-        else:
-            cv = None
-
         batches = []
 
-        for n in range(n_trials):
-            if cv:
-                train_index, test_index = cv.split(X, y)
+        if param_set['dataset'] == 'iris':
+            cv = RepeatedStratifiedKFold(n_splits=2, n_repeats=n_trials)
+
+            for train_index, test_index in cv.split(X, y_multiclass):
                 X_train, X_test, y_train, y_test = X[train_index], X[test_index], y[train_index], y[test_index]
-            else:
-                X_train, X_test, y_train, y_test = X, X, y, y
 
-            clf = param_set['clf_type']([
-                DenseLayer(hidden_layer_size, n_inputs=X.shape[1], activation_func=Sigmoid()),
-                DenseLayer(output_layer_size, activation_func=output_layer_activation_func)
-            ], learning_rate=param_set['learning_rate'], momentum=param_set['momentum'])
+                clf = param_set['clf_type']([
+                    DenseLayer(hidden_layer_size, n_inputs=X.shape[1], activation_func=Sigmoid()),
+                    DenseLayer(output_layer_size, activation_func=output_layer_activation_func)
+                ], learning_rate=param_set['learning_rate'], momentum=param_set['momentum'])
 
-            batches.append((clf, param_set['batch_size'], X_train, X_test, y_train, y_test))
+                batches.append((clf, param_set['batch_size'], X_train, X_test, y_train, y_test))
+        else:
+            for n in range(n_trials):
+                clf = param_set['clf_type']([
+                    DenseLayer(hidden_layer_size, n_inputs=X.shape[1], activation_func=Sigmoid()),
+                    DenseLayer(output_layer_size, activation_func=output_layer_activation_func)
+                ], learning_rate=param_set['learning_rate'], momentum=param_set['momentum'])
+
+                batches.append((clf, param_set['batch_size'], X, X, y, y))
 
         with multiprocessing.Pool(n_jobs) as p:
             p_results = p.starmap(evaluation_step, batches)
@@ -188,8 +211,9 @@ if __name__ == '__main__':
             scores.append(score)
             loss_histories.append(loss_history)
 
-        scores_mean = np.mean(scores)
-        scores_std = np.std(scores)
+        masked_scores = np.ma.masked_invalid(scores)
+        scores_mean = masked_scores.mean()
+        scores_std = masked_scores.std()
 
         results = ResultSet(run_id, scores, scores_mean, scores_std, param_set, loss_histories,
                             best_param_set_clf if best_param_set_clf else clf)
