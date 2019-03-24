@@ -61,6 +61,28 @@ class ReLU(Activation):
         return np.where(Y > 0, np.ones_like(Y), np.zeros_like(Y))
 
 
+class LeakyReLU(Activation):
+    """The leaky rectified linear unit (Leaky ReLU) activation function.
+
+    The benefit of this modification to the ReLU function is that there are no zero derivatives (except at x=0).
+    This helps prevent the issue of 'dead neurons'.
+    """
+
+    def __init__(self, alpha=0.1):
+        """Set up the Leaky ReLU activation function.
+
+        Arguments:
+            alpha: The multiplicative constant to apply when X <= 0.
+        """
+        self.alpha = alpha
+
+    def __call__(self, X):
+        return np.where(X > 0, X, self.alpha * X)
+
+    def derivative(self, Y):
+        return np.where(Y > 0, np.ones_like(Y), self.alpha)
+
+
 class Sigmoid(Activation):
     """The sigmoid (or logistic) activation function."""
 

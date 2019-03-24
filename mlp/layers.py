@@ -17,11 +17,21 @@ class Layer:
         self.n_inputs = n_inputs
         self.n_units = n_units
 
-    def forward(self, X):
+        self.network = None
+        self.next_layer = None
+
+        self.initialised = False
+
+    def initialise_weights(self):
+        """Do any additional setup."""
+        self.initialised = True
+
+    def forward(self, X, is_training=True):
         """Perform a forward pass of a layer.
 
         Arguments:
             X: The input to the layer.
+            is_training: Whether or not the forward pass is being done during training or not.
 
         Returns: The result of the forward pass of the layer.
         """
@@ -98,18 +108,15 @@ class DenseLayer(Layer):
         self.preactivation_value = None
 
         self.is_output = False
-        self.network = None
-        self.next_layer = None
-
-        self.initialised = False
 
     def initialise_weights(self):
         """Create and initialise the weight and bias matrices."""
+        super().initialise_weights()
+
         self.W = np.random.normal(0, 1, (self.n_inputs, self.n_units)) * np.sqrt(1.0 / self.n_inputs)
         self.b = np.random.normal(0, 1, (1, self.n_units))
         self.prev_dW = np.zeros_like(self.W)
         self.prev_db = np.zeros_like(self.b)
-        self.initialised = True
 
     @property
     def shape(self):
@@ -120,11 +127,12 @@ class DenseLayer(Layer):
         """
         return self.W.shape
 
-    def forward(self, X):
+    def forward(self, X, is_training=True):
         """Perform a forward pass of a layer.
 
         Arguments:
             X: The input to the layer.
+            is_training: Whether or not the forward pass is being done during training or not.
 
         Returns: The activation of the layer.
         """
@@ -181,7 +189,39 @@ class DenseLayer(Layer):
                           activation_func=getattr(mlp.activation_functions, json_dict['activation_func'])())
 
 
-# TODO: Implement gaussian noise layer.
 class GaussianNoise(Layer):
-    def __init__(self):
-        raise NotImplementedError
+    """This layer adds gaussian distributed noise to is inputs.
+
+    During back-propagation, this layer is skipped over.
+    """
+
+    def __init__(self, n_units, n_inputs=None, mean=0, std=1):
+        super().__init__(n_units, n_inputs)
+
+        self.mean = mean
+        self.std = std
+
+    @property
+    def W(self):
+        """Get the weights of the next layer.
+
+        Returns: The weight matrix of the next layer.
+        """
+        return self.next_layer.W
+
+    @property
+    def b(self):
+        """Get the bias of the next layer.
+
+        Returns: The bias vector of the next layer.
+        """
+        return self.next_layer.b
+
+    def forward(self, X, is_training=True):
+        if is_training:
+            return X + np.random.normal(self.mean, self.std, size=np.shape(X))
+        else:
+            return X
+
+    def backward(self, error_term):
+        return error_term

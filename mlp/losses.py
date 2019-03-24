@@ -69,7 +69,7 @@ class BinaryCrossEntropy(Loss):
 
 class CategoricalCrossEntropy(Loss):
     def __call__(self, y, y_pred):
-        loss = -np.mean(y * np.log(y_pred + 1e-9))
+        loss = -np.sum(y * np.log(y_pred + 1e-9), axis=1)
 
         self.grad = self.derivative(y, y_pred + 1e-9)
 

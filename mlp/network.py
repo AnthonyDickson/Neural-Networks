@@ -169,18 +169,19 @@ class MLP:
             layer.is_output = True
             layer.initialise_weights()
 
-    def _forward(self, X):
+    def _forward(self, X, is_training=True):
         """Perform a forward pass of the MLP.
 
         Arguments:
             X: The feature data set.
+            is_training: Whether or not the forward pass is being done during training or not.
 
         Returns; The output of the MLP.
         """
         output = X
 
         for layer in self.layers:
-            output = layer.forward(output)
+            output = layer.forward(output, is_training)
 
         return output
 
@@ -224,14 +225,7 @@ class MLP:
         val_loss_history = []
         val_score_history = []
 
-        if type(val_set) is int or type(val_set) is float:
-            X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_set, stratify=y)
-        elif type(val_set) is tuple:
-            X_train = X
-            y_train = y
-            X_val, y_val = val_set
-        else:
-            raise ValueError('Invalid type `%s` for val_set, expected int, float or tuple.' % type(val_set))
+        X_train, X_val, y_train, y_val = self._train_val_split(X, y, val_set)
 
         for epoch in range(n_epochs):
             epoch_train_loss_history = np.array([])
@@ -249,9 +243,8 @@ class MLP:
             train_loss_history.append(epoch_train_loss_history.mean())
             train_score_history.append(epoch_train_score_history.mean())
 
-            if val_set != 0:
-                val_loss_history.append(self.loss_func(y_val, self._forward(X_val)).mean())
-                val_score_history.append(self.score(X_val, y_val))
+            val_loss_history.append(self.loss_func(y_val, self._forward(X_val, is_training=False)).mean())
+            val_score_history.append(self.score(X_val, y_val))
 
             if log_verbosity > 0 and epoch % log_verbosity == 0:
                 print('epoch %d of %d - loss: %.4f - score: %.4f - val_loss: %.4f - val_score: %.4f'
@@ -263,12 +256,28 @@ class MLP:
 
                 if early_stopping.should_stop:
                     if log_verbosity > 0:
-                        print('Epoch %d of %d - Loss: %.4f' % (epoch + 1, n_epochs, train_loss_history[-1]))
+                        print('epoch %d of %d - loss: %.4f - score: %.4f - val_loss: %.4f - val_score: %.4f'
+                              % (epoch + 1, n_epochs, train_loss_history[-1], train_score_history[-1],
+                                 val_loss_history[-1], val_score_history[-1]))
                         print('Stopping early - %s.' % early_stopping.reason)
 
                     break
 
         return train_loss_history, train_score_history, val_loss_history, val_score_history
+
+    def _train_val_split(self, X, y, val_set):
+        if type(val_set) is int or type(val_set) is float:
+            if (type(val_set) is int and val_set < len(np.unique(y))) or val_set * len(X) < len(np.unique(y)):
+                X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_set)
+            else:
+                X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_set, stratify=y)
+        elif type(val_set) is tuple:
+            X_train, y_train = X, y
+            X_val, y_val = val_set
+        else:
+            raise ValueError('Invalid type `%s` for val_set, expected int, float or tuple.' % type(val_set))
+
+        return X_train, X_val, y_train, y_val
 
     def predict(self, X):
         """Predict the targets for a given feature data set.
@@ -400,7 +409,7 @@ class MLPRegressor(MLP):
 
         Returns: The predicted targets for the given feature data.
         """
-        return self._forward(X)
+        return self._forward(X, is_training=False)
 
     def score(self, X, y):
         y_pred = self.predict(X)
@@ -442,7 +451,7 @@ class MLPClassifier(MLPRegressor):
         Returns: The predicted targets for the given feature data as a
         probability distribution.
         """
-        return self._forward(X)
+        return self._forward(X, is_training=False)
 
     def predict(self, X):
         if isinstance(self.loss_func, BinaryCrossEntropy):
