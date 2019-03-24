@@ -23,11 +23,12 @@ if __name__ == '__main__':
         exit(1)
 
     param_grid = dict(
-        batch_size=[1, 2, 4, -1],
+        batch_size=[1, 2, -1],
         clf_type=[MLPRegressor.__name__, MLPClassifier.__name__],
         dataset=datasets,
-        learning_rate=[1e0, 1e-1, 1e-2, 1e-3],
-        momentum=[0.9, 0.1, 0],
+        gaussian_noise=[0, 0.01, 0.1],
+        learning_rate=[1e-3, 1e-2, 1e-1],
+        momentum=[0, 0.5, 0.9],
         shuffle_batches=[False, True]
     )
 
@@ -42,8 +43,9 @@ if __name__ == '__main__':
     if 'iris' not in datasets:
         os.remove(iris_experiment_filename)
     else:
-        param_grid['batch_size'] = batch_size = [8, 16, 32, 64]
+        param_grid['batch_size'] = batch_size = [8, 16, 32]
         param_grid['dataset'] = ['iris']
+        param_grid['gaussian_noise'] = [0, 0.01, 0.1]
 
         with open(iris_experiment_filename, 'w') as f:
             json.dump(param_grid, f)

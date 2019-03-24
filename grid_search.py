@@ -12,7 +12,7 @@ from sklearn.model_selection import ParameterGrid, RepeatedStratifiedKFold
 
 import mlp
 from mlp.activation_functions import Identity, Sigmoid, Softmax
-from mlp.layers import DenseLayer
+from mlp.layers import DenseLayer, GaussianNoise
 from mlp.losses import BinaryCrossEntropy, CategoricalCrossEntropy, RMSE
 from mlp.network import MLPRegressor, EarlyStopping
 
@@ -139,6 +139,7 @@ if __name__ == '__main__':
     data_dir = args.data_dir
     results_dir = args.results_dir
     n_trials = args.n_trials
+    n_splits = 5  # For cross validation
     n_jobs = args.n_jobs if args.n_jobs > 0 else len(os.sched_getaffinity(0))
 
     datasets = []
@@ -211,13 +212,14 @@ if __name__ == '__main__':
         clf = None
 
         if param_set['dataset'] == 'iris':
-            cv = RepeatedStratifiedKFold(n_splits=2, n_repeats=n_trials)
+            cv = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_trials // n_splits)
 
             for train_index, val_index in cv.split(X, y_multiclass):
                 X_train, X_val, y_train, y_val = X[train_index], X[val_index], y[train_index], y[val_index]
 
                 clf = param_set['clf_type']([
-                    DenseLayer(hidden_layer_size, n_inputs=X.shape[1], activation_func=Sigmoid()),
+                    GaussianNoise(X.shape[1], n_inputs=X.shape[1], std=param_set['gaussian_noise']),
+                    DenseLayer(hidden_layer_size, activation_func=Sigmoid()),
                     DenseLayer(output_layer_size, activation_func=output_layer_activation_func)
                 ], learning_rate=param_set['learning_rate'], momentum=param_set['momentum'])
 
@@ -226,7 +228,8 @@ if __name__ == '__main__':
         else:
             for n in range(n_trials):
                 clf = param_set['clf_type']([
-                    DenseLayer(hidden_layer_size, n_inputs=X.shape[1], activation_func=Sigmoid()),
+                    GaussianNoise(X.shape[1], n_inputs=X.shape[1], std=param_set['gaussian_noise']),
+                    DenseLayer(hidden_layer_size, activation_func=Sigmoid()),
                     DenseLayer(output_layer_size, activation_func=output_layer_activation_func)
                 ], learning_rate=param_set['learning_rate'], momentum=param_set['momentum'])
 
