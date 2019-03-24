@@ -243,8 +243,12 @@ class MLP:
             train_loss_history.append(epoch_train_loss_history.mean())
             train_score_history.append(epoch_train_score_history.mean())
 
-            val_loss_history.append(self.loss_func(y_val, self._forward(X_val, is_training=False)).mean())
-            val_score_history.append(self.score(X_val, y_val))
+            if val_set:
+                val_loss_history.append(self.loss_func(y_val, self._forward(X_val, is_training=False)).mean())
+                val_score_history.append(self.score(X_val, y_val))
+            else:
+                val_loss_history.append(np.nan)
+                val_score_history.append(np.nan)
 
             if log_verbosity > 0 and epoch % log_verbosity == 0:
                 print('epoch %d of %d - loss: %.4f - score: %.4f - val_loss: %.4f - val_score: %.4f'

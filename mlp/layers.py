@@ -26,6 +26,15 @@ class Layer:
         """Do any additional setup."""
         self.initialised = True
 
+    @property
+    def shape(self):
+        """Get the shape of the layer,
+
+        Returns: A 2-tuple containing the number of inputs for each unit and
+        the number of units in the layer.
+        """
+        return self.n_inputs, self.n_units
+
     def forward(self, X, is_training=True):
         """Perform a forward pass of a layer.
 
@@ -117,15 +126,6 @@ class DenseLayer(Layer):
         self.b = np.random.normal(0, 1, (1, self.n_units))
         self.prev_dW = np.zeros_like(self.W)
         self.prev_db = np.zeros_like(self.b)
-
-    @property
-    def shape(self):
-        """Get the shape of the layer,
-
-        Returns: A 2-tuple containing the number of inputs for each unit and
-        the number of units in the layer.
-        """
-        return self.W.shape
 
     def forward(self, X, is_training=True):
         """Perform a forward pass of a layer.
@@ -225,3 +225,17 @@ class GaussianNoise(Layer):
 
     def backward(self, error_term):
         return error_term
+
+    def json(self):
+        return dict(
+            layer_type=self.__class__.__name__,
+            n_inputs=self.n_inputs,
+            n_units=self.n_units,
+            mean=self.mean,
+            std=self.std
+        )
+
+    @staticmethod
+    def from_json(json_dict):
+        return GaussianNoise(n_units=json_dict['n_units'], n_inputs=json_dict['n_inputs'],
+                             mean=json_dict['mean'], std=json_dict['std'])
