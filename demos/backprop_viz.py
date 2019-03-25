@@ -50,11 +50,12 @@ def forward_pass_viz(g):
                 # Add edges from previous layer to this unit.
                 for i, node in enumerate(nodes[-2]):
                     sg.edge(node, nodes[-1][-1],
-                            label='<W<SUB>%d,%d</SUB>=%.4f>' % (l, j, layer.W[i, j]))
+                            label='<W<SUB>%d,%d</SUB>=%.4f>' % (i, j, layer.W[i, j]))
                     # label='%.4f' % layer.W[i, j])
 
                 # Add bias edge.
-                sg.edge('bias', nodes[-1][-1], label='%0.4f' % layer.b[0, j])
+                sg.edge('bias', nodes[-1][-1],
+                        label='<b<SUB>%d,%d</SUB>=%.4f>' % (l, j, layer.b[0, j]))
 
     return g
 
@@ -114,7 +115,7 @@ def backward_pass_viz(g):
                 for i, node in enumerate(nodes[last_layer]):
                     g.edge(node, nodes[l][j],
                            label='<&#916;W<SUB>%d,%d</SUB>=%.4f>' % (
-                               last_layer, j, model.layers[last_layer].prev_dW[j, i]))
+                               i, j, model.layers[last_layer].prev_dW[j, i]))
 
                 # Add bias edge.
                 sg.edge(nodes[l][j], 'bias',
@@ -128,7 +129,7 @@ def backward_pass_viz(g):
     for i in range(len(X[sample])):
         for j in range(model.layers[last_layer].n_units):
             g.edge(nodes[last_layer][j], 'x_%d' % i,
-                   label='<&#916;W<SUB>%d,%d</SUB>=%.4f>' % (l, j, model.layers[last_layer].prev_dW[i, j]))
+                   label='<&#916;W<SUB>%d,%d</SUB>=%.4f>' % (i, j, model.layers[last_layer].prev_dW[i, j]))
 
     return g
 
@@ -260,7 +261,7 @@ if __name__ == '__main__':
             loss_history[epoch] += loss / len(X)
 
             g = graphviz.Digraph()
-            g.attr('graph', rankdir='DU')
+            g.attr('graph', rankdir='LR', ranksep='1.4')
 
             if not skip:
                 with g.subgraph(name='cluster_inputs', body=['label = "Inputs";']) as sg:
@@ -287,7 +288,7 @@ if __name__ == '__main__':
 
             if not skip:
                 g = graphviz.Digraph()
-                g.attr('graph', rankdir='DU')
+                g.attr('graph', rankdir='LR', ranksep='1.4')
 
                 with g.subgraph(name='cluster_inputs', body=['label = "Inputs";']) as sg:
                     inputs_viz(sg)
