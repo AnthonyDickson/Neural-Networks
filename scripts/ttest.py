@@ -15,6 +15,7 @@ def _int2char(integer):
 
 def ttest(cfgs, metric='val_scores', greater_than=True, results_dir='../results'):
     dfs = []
+    ttest_results = None
 
     print('%s distribution per configuration (μ ± 2σ)' % metric)
 
@@ -69,6 +70,11 @@ def main(params, results_dir):
             if key == free_variable:
                 value = value[i]
 
+            # This is necessary since when a hyper parameter is zero it is printed as an integer, however
+            # zero-valued float print as '0.0'.
+            if type(value) is float and value == 0:
+                value = int(value)
+
             kv_pairs.append('%s=%s' % (key, str(value)))
 
         cfg = '/'.join(kv_pairs)
@@ -96,14 +102,14 @@ if __name__ == '__main__':
                                                  'One parameter should be defined as a list of values. For example, '
                                                  'if you wanted to see what batch size gives better results then you '
                                                  'could set the batch size arguments to `[16, 32]`')
-    parser.add_argument('--results-dir', type=str, default='../results', help='Where the results are located.')
-    parser.add_argument('--batch-size', type=int, nargs='+', required=True)
-    parser.add_argument('--clf-type', type=str, nargs='+', required=True)
-    parser.add_argument('--dataset', type=str, nargs='+', required=True)
-    parser.add_argument('--gaussian-noise', type=float, nargs='+', required=True)
-    parser.add_argument('--learning-rate', type=float, nargs='+', required=True)
-    parser.add_argument('--momentum', type=float, nargs='+', required=True)
-    parser.add_argument('--shuffle-batches', type=lambda v: type(v) is str and v.lower() == 'true',
+    parser.add_argument('-r', '--results-dir', type=str, default='../results', help='Where the results are located.')
+    parser.add_argument('-b', '--batch-size', type=int, nargs='+', required=True)
+    parser.add_argument('-c', '--clf-type', type=str, nargs='+', required=True)
+    parser.add_argument('-d', '--dataset', type=str, nargs='+', required=True)
+    parser.add_argument('-g', '--gaussian-noise', type=float, nargs='+', required=True)
+    parser.add_argument('-l', '--learning-rate', type=float, nargs='+', required=True)
+    parser.add_argument('-m', '--momentum', type=float, nargs='+', required=True)
+    parser.add_argument('-s', '--shuffle-batches', type=lambda v: type(v) is str and v.lower() == 'true',
                         nargs='+', required=True)
 
     args = parser.parse_args()
