@@ -220,6 +220,11 @@ class MLP:
 
         Returns: A 4-tuple of training loss, training score, validation loss, and validation score history data.
         """
+        assert len(y.shape) == 2, 'The target vector `y` must either be a column vector or matrix, ' \
+                                  'got a row vector instead.\n' \
+                                  'If `y` has one \'feature\' then you can reshape y with `y.reshape(-1, 1)`, ' \
+                                  'otherwise if `y` is a single sample then can reshape y with `y.reshape(1, -1)`.'
+
         train_loss_history = []
         train_score_history = []
         val_loss_history = []

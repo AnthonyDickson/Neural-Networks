@@ -1,5 +1,8 @@
 name: cosc420
 dependencies:
-  - numpy
-  - scikit-learn
   - matplotlib
+  - numpy
+  - pandas
+  - scikit-learn
+  - pip:
+      - graphviz

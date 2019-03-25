@@ -9,15 +9,9 @@ def load_iris():
     return X, y
 
 def load_XOR():
-    X = np.array([[0, 0],
-                  [0, 1],
-                  [1, 0],
-                  [1, 1]])
-
-    y = np.array([[0],
-                  [1],
-                  [1],
-                  [0]])
+    X = np.genfromtxt('data/xor/in.txt')
+    y = np.genfromtxt('data/xor/teach.txt')
+    y = y.reshape(-1, 1)
 
     return X, y
 
