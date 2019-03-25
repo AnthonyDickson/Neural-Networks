@@ -1,3 +1,8 @@
+import os
+import sys
+
+sys.path.append(os.path.abspath('../'))
+
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import utils
@@ -12,12 +17,12 @@ from mlp.network import MLPRegressor, EarlyStopping
 if __name__ == '__main__':
     np.random.seed(42)
 
-    X, y = load_iris()
+    X, y = load_iris(data_dir='../data/')
     X, y = utils.shuffle(X, y, random_state=42)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, stratify=y)
 
     n_inputs = X.shape[1]
-    mlp = MLPRegressor([GaussianNoise(n_inputs, n_inputs=n_inputs, std=0.1),
+    mlp = MLPRegressor([GaussianNoise(n_inputs, n_inputs=n_inputs, std=0.01),
                         DenseLayer(n_inputs, activation_func=Sigmoid()),
                         DenseLayer(3, activation_func=Identity())],
                        learning_rate=0.03, momentum=0.9, loss_func=RMSE())

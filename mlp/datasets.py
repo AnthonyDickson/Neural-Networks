@@ -2,15 +2,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def load_iris():
-    X = np.genfromtxt('data/iris/in.txt')
-    y = np.genfromtxt('data/iris/teach.txt')
+def load_iris(data_dir='data/'):
+    if not data_dir.endswith('/'):
+        data_dir += '/'
+
+    X = np.genfromtxt(data_dir + 'iris/in.txt')
+    y = np.genfromtxt(data_dir + 'iris/teach.txt')
 
     return X, y
 
-def load_XOR():
-    X = np.genfromtxt('data/xor/in.txt')
-    y = np.genfromtxt('data/xor/teach.txt')
+
+def load_XOR(data_dir='data/'):
+    if not data_dir.endswith('/'):
+        data_dir += '/'
+
+    X = np.genfromtxt(data_dir + 'xor/in.txt')
+    y = np.genfromtxt(data_dir + 'xor/teach.txt')
     y = y.reshape(-1, 1)
 
     return X, y

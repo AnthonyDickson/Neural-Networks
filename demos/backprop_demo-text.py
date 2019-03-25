@@ -14,7 +14,8 @@ from mlp.network import MLP
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Step through the training process of a MLP.')
-    parser.add_argument('model', metavar='model_file', type=str, help='The json file describing the model to use.')
+    parser.add_argument('-m', '--model-file', type=str, default='xor_model.json',
+                        help='The json file describing the model to use.')
     parser.add_argument('-d', '--dataset-path', type=str, default='../data/xor', help='The path to a dataset.')
     parser.add_argument('-s', '--shuffle', action='store_true',
                         help='Flag indicating that the dataset should be shuffled.')
@@ -22,7 +23,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
 
-    with open(args.model, 'r') as f:
+    with open(args.model_file, 'r') as f:
         model_json = json.load(f)
 
     model = MLP.from_json(model_json)

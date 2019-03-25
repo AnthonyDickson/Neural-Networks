@@ -1,3 +1,8 @@
+import os
+import sys
+
+sys.path.append(os.path.abspath('../'))
+
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import utils
@@ -10,7 +15,7 @@ from mlp.network import MLPRegressor, EarlyStopping
 if __name__ == '__main__':
     np.random.seed(42)
 
-    X, y = load_XOR()
+    X, y = load_XOR(data_dir='../data/')
     X, y = utils.shuffle(X, y, random_state=42)
 
     mlp = MLPRegressor([GaussianNoise(2, n_inputs=2, std=0.01),

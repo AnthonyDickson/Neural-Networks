@@ -1,3 +1,8 @@
+import os
+import sys
+
+sys.path.append(os.path.abspath('../'))
+
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import utils
@@ -12,7 +17,7 @@ from mlp.network import MLPClassifier, EarlyStopping
 if __name__ == '__main__':
     np.random.seed(42)
 
-    X, y = load_iris()
+    X, y = load_iris(data_dir='../data/')
     X, y = utils.shuffle(X, y, random_state=42)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, stratify=y)
 
