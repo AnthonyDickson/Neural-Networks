@@ -7,6 +7,7 @@ import argparse
 import json
 
 import graphviz
+import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import utils
 
@@ -166,6 +167,16 @@ def outputs_viz(sg):
         sg.edge('%d_%d' % (l, j), 'error')
 
 
+def plot(loss_history):
+    plt.plot(loss_history, label='train')
+    plt.xlim(0)
+    plt.xlabel('Epoch')
+    plt.ylabel('%s Loss' % model.loss_func.__class__.__name__)
+    plt.title('Loss vs. Epochs for model loaded from \'%s\'' % args.model_file)
+    plt.legend()
+    plt.show()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Step through the training process of a MLP.')
     parser.add_argument('-m', '--model-file', type=str, default='xor_model.json',
@@ -196,7 +207,8 @@ if __name__ == '__main__':
     skip = False
     epoch = 0
     skip_epochs = 0
-
+    loss_history = []
+    N = len(X)
 
     def prompt():
         global skip, skip_epochs
@@ -217,6 +229,7 @@ if __name__ == '__main__':
 
             cmd = input('Enter `q` to quit, '
                         '`skip n` to skip forward n epochs, '
+                        '`plot` to plot the loss history so far, '
                         'or press enter continue: ')
 
             cmd = cmd.lower()
@@ -224,6 +237,8 @@ if __name__ == '__main__':
 
             if cmd == 'q':
                 break
+            elif cmd == 'plot':
+                plot(loss_history)
             elif parts and parts[0] == 'skip' and len(parts) == 2:
                 try:
                     skip_epochs = int(parts[1])
@@ -236,10 +251,13 @@ if __name__ == '__main__':
 
             print()
 
-        for sample in range(len(X)):
+        loss_history.append(0)
+
+        for sample in range(N):
             y_pred = model._forward(X[sample].reshape(1, -1))
             error = y[sample] - y_pred
             loss = model.loss_func(y[sample], y_pred)
+            loss_history[epoch] += loss / len(X)
 
             g = graphviz.Digraph()
             g.attr('graph', rankdir='DU')
