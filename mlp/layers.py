@@ -11,6 +11,7 @@ from mlp.activation_functions import Identity
 
 class Layer:
     """An abstraction of a layer in a neural network."""
+    layer_count = 0
 
     def __init__(self, n_units, n_inputs=None):
         """Create"""
@@ -21,6 +22,7 @@ class Layer:
         self.next_layer = None
 
         self.initialised = False
+        Layer.layer_count += 1
 
     def initialise_weights(self):
         """Do any additional setup."""
@@ -117,6 +119,9 @@ class DenseLayer(Layer):
         self.preactivation_value = None
 
         self.is_output = False
+        self.name = '%s_%d (%s)' % (self.__class__.__name__,
+                                    DenseLayer.layer_count,
+                                    self.activation_func.__class__.__name__)
 
     def initialise_weights(self):
         """Create and initialise the weight and bias matrices."""
@@ -201,6 +206,8 @@ class GaussianNoise(Layer):
         self.mean = mean
         self.std = std
 
+        self.name = '%s_%d' % (self.__class__.__name__, GaussianNoise.layer_count)
+
     @property
     def W(self):
         """Get the weights of the next layer.
@@ -225,6 +232,10 @@ class GaussianNoise(Layer):
 
     def backward(self, error_term):
         return error_term
+
+    def __str__(self):
+        return '%s(n_inputs=%d, n_units=%d, mean=%f, std=%f)' \
+               % (self.__class__.__name__, self.n_inputs, self.n_units, self.mean, self.std)
 
     def json(self):
         return dict(

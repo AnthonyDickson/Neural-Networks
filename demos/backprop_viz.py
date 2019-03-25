@@ -37,7 +37,7 @@ def forward_pass_viz(g):
         nodes.append([])
 
         with g.subgraph(name='cluster_layer_%d' % l,
-                        body=['label = "%s_%d";' % (layer.__class__.__name__, l)]) as sg:
+                        body=['label = "%s";' % layer.name]) as sg:
             for j in range(layer.n_units):
                 # Add unit + preactvation and activation values.
                 nodes[-1].append('%d_%d' % (l, j))
@@ -48,7 +48,9 @@ def forward_pass_viz(g):
 
                 # Add edges from previous layer to this unit.
                 for i, node in enumerate(nodes[-2]):
-                    sg.edge(node, nodes[-1][-1], label='%.4f' % layer.W[i, j])
+                    sg.edge(node, nodes[-1][-1],
+                            label='<W<SUB>%d,%d</SUB>=%.4f>' % (l, j, layer.W[i, j]))
+                    # label='%.4f' % layer.W[i, j])
 
                 # Add bias edge.
                 sg.edge('bias', nodes[-1][-1], label='%0.4f' % layer.b[0, j])
@@ -69,7 +71,7 @@ def backward_pass_viz(g):
     layer = model.layers[l]
 
     with g.subgraph(name='cluster_layer_%d' % l,
-                    body=['label = "%s_%d";' % (layer.__class__.__name__, l)]) as sg:
+                    body=['label = "%s";' % layer.name]) as sg:
 
         for j in range(layer.n_units):
             nodes[l].append('bp%d_%d' % (l, j))
@@ -97,7 +99,7 @@ def backward_pass_viz(g):
         nodes.append([])
 
         with g.subgraph(name='cluster_layer_%d' % l,
-                        body=['label = "%s_%d";' % (layer.__class__.__name__, l)]) as sg:
+                        body=['label = "%s";' % layer.name]) as sg:
 
             for j in range(layer.n_units):
                 nodes[l].append('bp%d_%d' % (l, j))
@@ -197,18 +199,25 @@ if __name__ == '__main__':
 
 
     def prompt():
+        global skip, skip_epochs
+
         if not skip:
-            input('Press enter to continue:')
+            cmd = input('Press enter to continue or `s` to skip to next epoch:')
+
+            if cmd.lower() == 's':
+                skip_epochs = 1
+                skip = True
 
 
     while True:
         if not skip:
             print('*' * 80)
             print('Epoch: %d' % (epoch + 1))
+            print('Epoch score: %.4f' % model.score(X, y))
 
             cmd = input('Enter `q` to quit, '
                         '`skip n` to skip forward n epochs, '
-                        'or press enter continue.')
+                        'or press enter continue: ')
 
             cmd = cmd.lower()
             parts = cmd.split()
@@ -254,7 +263,7 @@ if __name__ == '__main__':
 
             for layer in reversed(model.layers):
                 if not error_grads:
-                    error_grads.append(layer.backward(error))
+                    error_grads.append(layer.backward(model.loss_func.grad))
                 else:
                     error_grads.append(layer.backward(error_grads[-1]))
 
@@ -275,8 +284,6 @@ if __name__ == '__main__':
                 g.render('viz/temp.gz', view=True)
                 print('Backward pass of sample %d' % sample)
                 prompt()
-
-        print('Epoch score: %.4f' % model.score(X, y))
 
         epoch += 1
 

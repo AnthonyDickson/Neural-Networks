@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import utils
 
-from mlp.activation_functions import Identity, ReLU
+from mlp.activation_functions import Identity, LeakyReLU
 from mlp.datasets import load_XOR
 from mlp.layers import DenseLayer, GaussianNoise
 from mlp.network import MLPRegressor, EarlyStopping
@@ -19,7 +19,7 @@ if __name__ == '__main__':
     X, y = utils.shuffle(X, y, random_state=42)
 
     mlp = MLPRegressor([GaussianNoise(2, n_inputs=2, std=0.01),
-                        DenseLayer(2, activation_func=ReLU()),
+                        DenseLayer(2, activation_func=LeakyReLU()),
                         DenseLayer(1, activation_func=Identity())],
                        learning_rate=0.1)
 
