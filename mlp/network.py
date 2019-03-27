@@ -73,7 +73,7 @@ class EarlyStopping:
     Training can be stopped early based on the lack of improvement of loss or upon reaching a target loss,
     """
 
-    def __init__(self, patience=10, min_improvement=1e-5, criterion=2e-2):
+    def __init__(self, patience=10, min_improvement=1e-5, criterion=0.999):
         """
         Create an EarlyStopping object.
 
@@ -83,7 +83,7 @@ class EarlyStopping:
 
             min_improvement: The minimum change of loss that is to be considered an improvement.
 
-            criterion: The learning criterion, or the target loss. Training is stopped once the loss is less than the
+            criterion: The learning criterion, or the target score. Training is stopped once the score is greater than the
             criterion.
         """
         self.patience = patience
@@ -93,6 +93,7 @@ class EarlyStopping:
         self.min_loss = 2 ** 32 - 1
         self.reason = ''
         self.last_loss = 2 ** 32 - 1
+        self.last_score = -2 ** 32 + 1
 
     @property
     def should_stop(self):
@@ -104,20 +105,21 @@ class EarlyStopping:
             self.reason = 'loss has stopped improving'
 
             return True
-        elif self.criterion > 0 and self.last_loss < self.criterion:
-            self.reason = 'reached target error criterion'
+        elif self.criterion > 0 and self.last_score > self.criterion:
+            self.reason = 'reached target score criterion'
 
             return True
         else:
             return False
 
-    def update(self, loss):
+    def update(self, loss, score):
         """Update the state of the early stopping object.
 
         Arguments:
             loss: The loss to measure.
+            score: The score to measure.
         """
-        self.last_loss = loss
+        self.last_score = score
 
         if self.min_loss - loss > self.min_improvement:
             self.min_loss = loss
@@ -261,7 +263,10 @@ class MLP:
                          val_loss_history[-1], val_score_history[-1]))
 
             if early_stopping:
-                early_stopping.update(val_loss_history[-1] if val_set != 0 else train_loss_history[-1])
+                if val_set:
+                    early_stopping.update(val_loss_history[-1], val_score_history[-1])
+                else:
+                    early_stopping.update(train_loss_history[-1], train_score_history[-1])
 
                 if early_stopping.should_stop:
                     if log_verbosity > 0:
@@ -318,14 +323,14 @@ class MLP:
 
         return '%s(layers=%s, learning_rate=%s, momentum=%s, loss_func=%s())' % (class_name, layers, lr, m, lf)
 
-    def json(self):
+    def to_json(self):
         """Create a JSON representation of a layer.
 
         Returns: a JSON-convertible dictionary containing the hyper-parameters that describe the MLP.
         """
         return dict(
             clf_type=self.__class__.__name__,
-            layers=[layer.json() for layer in self.layers],
+            layers=[layer.to_json() for layer in self.layers],
             learning_rate=self.learning_rate,
             momentum=self.momentum,
             loss_func=str(self.loss_func)
@@ -340,7 +345,7 @@ class MLP:
             filename: The path + filename indicating where to save the MLP.
         """
         with open(filename, 'w') as file:
-            json.dump(self.json(), file)
+            json.dump(self.to_json(), file)
 
     def save_weights(self, filename):
         """Save the weights and bias of a MLP to disk.

@@ -63,10 +63,10 @@ class Layer:
     def __str__(self):
         return '%s(n_inputs=%d, n_units=%d)' % (self.__class__.__name__, self.n_inputs, self.n_units)
 
-    def json(self):
+    def to_json(self):
         """Create a JSON representation of a layer.
 
-        Returns: a JSON-convertable dictionary containing the parameters that describe the layer instance.
+        Returns: a JSON-convertible dictionary containing the parameters that describe the layer instance.
         """
         return dict(
             layer_type=self.__class__.__name__,
@@ -181,17 +181,19 @@ class DenseLayer(Layer):
         return '%s(n_inputs=%d, n_units=%d, activation_func=%s())' \
                % (self.__class__.__name__, self.n_inputs, self.n_units, str(self.activation_func))
 
-    def json(self):
-        json_dict = super().json()
-        json_dict['activation_func'] = str(self.activation_func)
+    def to_json(self):
+        json_dict = super().to_json()
+        json_dict['activation_func'] = self.activation_func.to_json()
 
         return json_dict
 
     @staticmethod
     def from_json(json_dict):
+        activation_func = mlp.activation_functions.Activation.from_json(json_dict['activation_func'])
+
         return DenseLayer(n_units=json_dict['n_units'],
                           n_inputs=json_dict['n_inputs'],
-                          activation_func=getattr(mlp.activation_functions, json_dict['activation_func'])())
+                          activation_func=activation_func)
 
 
 class GaussianNoise(Layer):
@@ -237,7 +239,7 @@ class GaussianNoise(Layer):
         return '%s(n_inputs=%d, n_units=%d, mean=%f, std=%f)' \
                % (self.__class__.__name__, self.n_inputs, self.n_units, self.mean, self.std)
 
-    def json(self):
+    def to_json(self):
         return dict(
             layer_type=self.__class__.__name__,
             n_inputs=self.n_inputs,
