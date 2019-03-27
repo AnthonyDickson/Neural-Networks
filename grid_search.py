@@ -34,6 +34,9 @@ class ResultSet:
         if isinstance(params['clf_type'], type):
             params['clf_type'] = params['clf_type'].__name__
 
+        if isinstance(params['activation_func'], type):
+            params['activation_func'] = params['activation_func'].__name__
+
         self.run_id = run_id
         self.clf = clf
         self.params = params
@@ -46,36 +49,24 @@ class ResultSet:
         return ResultSet(self.run_id, self.clf, self.params,
                          self.train_loss, self.train_scores, self.val_loss, self.val_scores)
 
-    def json(self):
+    def to_json(self):
         masked_train_loss = np.ma.masked_invalid(self.train_loss)
         masked_train_scores = np.ma.masked_invalid(self.train_scores)
         masked_val_loss = np.ma.masked_invalid(self.val_loss)
         masked_val_scores = np.ma.masked_invalid(self.val_scores)
 
-        train_loss_mean = masked_train_loss.mean().tolist()
-        train_scores_mean = masked_train_scores.mean().tolist()
-        val_loss_mean = masked_val_loss.mean().tolist()
-        val_scores_mean = masked_val_scores.mean().tolist()
-
-        train_loss_std = masked_train_loss.std().tolist()
-        train_scores_std = masked_train_scores.std().tolist()
-        val_loss_std = masked_val_loss.std().tolist()
-        val_scores_std = masked_val_scores.std().tolist()
-
-        if isinstance(val_loss_mean, np.ma.core.MaskedConstant):
-            val_loss_mean.fill(float('-inf'))  # would be NaN anyway so doesn't matter what this is set to.
+        train_loss_min = masked_train_loss.min().tolist()
+        train_scores_max = masked_train_scores.max().tolist()
+        val_loss_min = masked_val_loss.min().tolist()
+        val_scores_max = masked_val_scores.max().tolist()
 
         return {
             'run_id': self.run_id,
             'params': self.params,
-            'train_loss_mean': train_loss_mean,
-            'train_scores_mean': train_scores_mean,
-            'val_loss_mean': val_loss_mean,
-            'val_scores_mean': val_scores_mean,
-            'train_loss_std': train_loss_std,
-            'train_scores_std': train_scores_std,
-            'val_loss_std': val_loss_std,
-            'val_scores_std': val_scores_std
+            'train_loss_min': train_loss_min,
+            'train_scores_max': train_scores_max,
+            'val_loss_min': val_loss_min,
+            'val_scores_max': val_scores_max
         }
 
     def save(self, path, subdir=None):
@@ -86,7 +77,7 @@ class ResultSet:
         os.makedirs(run_path, exist_ok=True)
 
         with open(run_path + 'statistics.json', 'w') as file:
-            json.dump(self.json(), file)
+            json.dump(self.to_json(), file)
 
         np.save(run_path + 'train_loss', self.train_loss)
         np.save(run_path + 'train_scores', self.train_scores)
@@ -94,6 +85,55 @@ class ResultSet:
         np.save(run_path + 'val_scores', self.val_scores)
         self.clf.save(run_path + 'model.json')
         self.clf.save_weights(run_path + 'weights')
+
+
+def load_cfg(cfg_file):
+    with open(cfg_file, 'r') as f:
+        grid_search_cfg = json.load(f)
+
+        if 'clf_type' in grid_search_cfg:
+            for i, clf_type in enumerate(grid_search_cfg['clf_type']):
+                class_ = getattr(mlp.network, clf_type)
+
+                grid_search_cfg['clf_type'][i] = class_
+
+        if 'activation_func' in grid_search_cfg:
+            for i, activation_type in enumerate(grid_search_cfg['activation_func']):
+                class_ = getattr(mlp.activation_functions, activation_type)
+
+                grid_search_cfg['activation_func'][i] = class_
+
+        print('Loaded configuration file: %s.\n' % cfg_file)
+
+    return grid_search_cfg
+
+
+def validate_datasets(data_dir, config):
+    print('Scanning \'%s\' directory for data sets...' % data_dir)
+
+    try:
+        _, datasets, _ = next(os.walk(data_dir))
+        datasets = sorted(datasets)
+        print('Found the following data sets: ' + ', '.join(datasets))
+
+        for dataset in config['dataset']:
+            assert dataset in datasets, "The dataset '%s' was found in the configuration files, but it was " \
+                                        "not found in the data directory '%s'." % (dataset, data_dir)
+    except StopIteration:
+        print('The data directory \'%s\' was not found.' % data_dir)
+        return False
+
+    return True
+
+
+def get_model(shape, output_layer_activation_func, loss_func, param_set):
+    input_shape, hidden_layer_size, output_layer_size = shape
+
+    return param_set['clf_type']([
+        GaussianNoise(input_shape, n_inputs=input_shape, std=param_set['gaussian_noise']),
+        DenseLayer(hidden_layer_size, activation_func=param_set['activation_func']()),
+        DenseLayer(output_layer_size, activation_func=output_layer_activation_func)
+    ], learning_rate=param_set['learning_rate'], momentum=param_set['momentum'], loss_func=loss_func)
 
 
 def pad(a, length, fill_value=float('-inf')):
@@ -107,10 +147,10 @@ def pad(a, length, fill_value=float('-inf')):
     return temp
 
 
-def evaluation_step(clf, batch_size, shuffle_batches, X_train, X_val, y_train, y_val, n_epochs=10000):
-    es = EarlyStopping(patience=100)
+def evaluation_step(clf, batch_size, shuffle_batches, X_train, y_train, val_set=0, n_epochs=10000):
+    es = EarlyStopping(patience=100, criterion=0.99)
 
-    train_loss, train_score, val_loss, val_score = clf.fit(X_train, y_train, val_set=(X_val, y_val),
+    train_loss, train_score, val_loss, val_score = clf.fit(X_train, y_train, val_set=val_set,
                                                            n_epochs=n_epochs, batch_size=batch_size,
                                                            shuffle_batches=shuffle_batches, early_stopping=es,
                                                            log_verbosity=0)
@@ -119,56 +159,26 @@ def evaluation_step(clf, batch_size, shuffle_batches, X_train, X_val, y_train, y
     train_score = pad(train_score, n_epochs)
     val_loss = pad(val_loss, n_epochs)
     val_score = pad(val_score, n_epochs)
+    score = clf.score(*val_set) if val_set != 0 else clf.score(X_train, y_train)
 
-    return clf.score(X_val, y_val), train_loss, train_score, val_loss, val_score
+    return score, train_loss, train_score, val_loss, val_score
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Run grid search on various MLP configurations and datasets.')
-    parser.add_argument('config', type=str, help='The configuration file to use for this experiment. '
-                                                 'See `generate_grid_search_cfgs.py`,')
-    parser.add_argument('--data-dir', type=str, default='data/', help='Where the data sets are located.')
-    parser.add_argument('--results-dir', type=str, default='results/', help='Where to save the results to.')
-    parser.add_argument('--n-trials', type=int, default=20, help='How many times to repeat each configuration.')
-    parser.add_argument('--n-jobs', type=int, default=1, help='How many processors to use.')
-
-    args = parser.parse_args()
-
-    np.random.seed(42)
+def run_grid_search(args):
+    np.random.seed(args.random_seed)
 
     data_dir = args.data_dir
     results_dir = args.results_dir
     n_trials = args.n_trials
-    n_splits = 5  # For cross validation
+    n_splits = args.n_splits
     n_jobs = args.n_jobs if args.n_jobs > 0 else len(os.sched_getaffinity(0))
 
-    datasets = []
+    grid_search_cfg = load_cfg(args.config)
 
-    print('Scanning \'%s\' directory for data sets...' % data_dir)
-
-    try:
-        _, datasets, _ = next(os.walk('data'))
-        datasets = sorted(datasets)
-        print('Found the following data sets: ' + ', '.join(datasets))
-    except StopIteration:
-        print('\'data\' directory not found.')
+    if not validate_datasets(data_dir, grid_search_cfg):
         exit(1)
 
-    with open(args.config, 'r') as f:
-        grid_search_cfg = json.load(f)
-
-        if 'clf_type' in grid_search_cfg:
-            for i, clf_type in enumerate(grid_search_cfg['clf_type']):
-                class_ = getattr(mlp.network, clf_type)
-
-                grid_search_cfg['clf_type'][i] = class_
-
-        print('Loaded configuration file: %s.\n' % args.config)
-
     param_grid = ParameterGrid(grid_search_cfg)
-
-    best_score = -2 ** 32 - 1
-    best_results = None
     n_param_sets = len(param_grid)
     total_steps = n_param_sets * n_trials
 
@@ -196,6 +206,7 @@ if __name__ == '__main__':
 
         hidden_layer_size = ParamSet(raw_params).hidden_layer_size
         output_layer_size = y.shape[1]
+        shape = (X.shape[1], hidden_layer_size, output_layer_size)
 
         if param_set['clf_type'] == MLPRegressor:
             output_layer_activation_func = Identity()
@@ -217,24 +228,15 @@ if __name__ == '__main__':
             for train_index, val_index in cv.split(X, y_multiclass):
                 X_train, X_val, y_train, y_val = X[train_index], X[val_index], y[train_index], y[val_index]
 
-                clf = param_set['clf_type']([
-                    GaussianNoise(X.shape[1], n_inputs=X.shape[1], std=param_set['gaussian_noise']),
-                    DenseLayer(hidden_layer_size, activation_func=Sigmoid()),
-                    DenseLayer(output_layer_size, activation_func=output_layer_activation_func)
-                ], learning_rate=param_set['learning_rate'], momentum=param_set['momentum'])
-
+                clf = get_model(shape, output_layer_activation_func, loss_func, param_set)
                 batches.append((clf, param_set['batch_size'], param_set['shuffle_batches'],
-                                X_train, X_val, y_train, y_val))
+                                X_train, y_train, (X_val, y_val)))
         else:
             for n in range(n_trials):
-                clf = param_set['clf_type']([
-                    GaussianNoise(X.shape[1], n_inputs=X.shape[1], std=param_set['gaussian_noise']),
-                    DenseLayer(hidden_layer_size, activation_func=Sigmoid()),
-                    DenseLayer(output_layer_size, activation_func=output_layer_activation_func)
-                ], learning_rate=param_set['learning_rate'], momentum=param_set['momentum'])
-
+                clf = get_model(shape, output_layer_activation_func, loss_func, param_set)
+                X_train, y_train = utils.shuffle(X, y)
                 batches.append((clf, param_set['batch_size'], param_set['shuffle_batches'],
-                                X, X, y, y))
+                                X_train, y_train))
 
         with multiprocessing.Pool(n_jobs) as p:
             p_results = p.starmap(evaluation_step, batches)
@@ -262,14 +264,25 @@ if __name__ == '__main__':
         subdir = '/'.join(['%s=%s' % (key, str(value)) for key, value in zip(param_set.keys(), param_set.values())])
         results.save(results_dir, subdir)
 
-        if best_param_set_score > best_score and best_param_set_score > -2:
-            best_score = best_param_set_score
-            best_results = results.__copy__()
-
         curr_step = (i + 1) * n_trials
         print('\rProgress: %d/%d (%05.2f%%) - Elapsed time: %s'
               % (curr_step, total_steps, 100 * curr_step / total_steps, datetime.now() - start),
               end='')
 
-    best_results.save(results_dir, subdir='best')
     print('\nDone.')
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Run grid search on various MLP configurations and datasets.')
+    parser.add_argument('config', type=str, help='The configuration file to use for this experiment. '
+                                                 'See `generate_grid_search_cfgs.py`,')
+    parser.add_argument('--data-dir', type=str, default='data/', help='Where the data sets are located.')
+    parser.add_argument('--results-dir', type=str, default='results/', help='Where to save the results to.')
+    parser.add_argument('--n-trials', type=int, default=20, help='How many times to repeat each configuration.')
+    parser.add_argument('--n-splits', type=int, default=5, help='How many folds to use for cross validation.')
+    parser.add_argument('--n-jobs', type=int, default=1, help='How many processors to use.')
+    parser.add_argument('--random-seed', type=int, default=42, help='The seed for the random number generator.')
+
+    args = parser.parse_args()
+
+    run_grid_search(args)

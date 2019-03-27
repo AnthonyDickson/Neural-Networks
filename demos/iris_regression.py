@@ -27,7 +27,7 @@ if __name__ == '__main__':
                         DenseLayer(3, activation_func=Identity())],
                        learning_rate=0.03, momentum=0.9, loss_func=RMSE())
 
-    train_loss, train_score, val_loss, val_score = mlp.fit(X_train, y_train, val_set=0.1, n_epochs=10000, batch_size=4,
+    train_loss, train_score, val_loss, val_score = mlp.fit(X_train, y_train, val_set=0.2, n_epochs=10000, batch_size=4,
                                                            shuffle_batches=True,
                                                            early_stopping=EarlyStopping(patience=400),
                                                            log_verbosity=100)

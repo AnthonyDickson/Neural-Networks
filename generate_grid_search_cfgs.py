@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 
+from mlp.activation_functions import Sigmoid, LeakyReLU
 from mlp.network import MLPRegressor, MLPClassifier
 
 if __name__ == '__main__':
@@ -23,8 +24,9 @@ if __name__ == '__main__':
         exit(1)
 
     param_grid = dict(
+        activation_func=[LeakyReLU.__name__, Sigmoid.__name__],
         batch_size=[1, 2, -1],
-        clf_type=[MLPRegressor.__name__, MLPClassifier.__name__],
+        clf_type=[MLPClassifier.__name__, MLPRegressor.__name__],
         dataset=datasets,
         gaussian_noise=[0, 0.01, 0.1],
         learning_rate=[1e-3, 1e-2, 1e-1],

@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
     X, y = load_iris(data_dir='../data/')
     X, y = utils.shuffle(X, y, random_state=42)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, stratify=y)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y)
 
     n_inputs = X.shape[1]
     mlp = MLPClassifier([GaussianNoise(n_inputs, n_inputs=n_inputs, std=0.04),
@@ -27,7 +27,7 @@ if __name__ == '__main__':
                          DenseLayer(3, activation_func=Softmax())],
                         learning_rate=0.03, momentum=0.9, loss_func=CategoricalCrossEntropy())
 
-    train_loss, train_score, val_loss, val_score = mlp.fit(X_train, y_train, val_set=0.1, n_epochs=10000, batch_size=4,
+    train_loss, train_score, val_loss, val_score = mlp.fit(X_train, y_train, val_set=0.2, n_epochs=10000, batch_size=4,
                                                            shuffle_batches=True,
                                                            early_stopping=EarlyStopping(patience=400),
                                                            log_verbosity=100)
