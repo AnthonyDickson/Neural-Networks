@@ -425,14 +425,23 @@ class MLPRegressor(MLP):
         """
         return self._forward(X, is_training=False)
 
-    def score(self, X, y):
+    def score(self, X, y, eps=1e-15):
+        """Calculate the score for given feature and target data sets.
+
+        Arguments:
+            X: The feature data set.
+            y: The target data set.
+            eps: A small constant to avoid zero division when calculating the Pearson R coefficient.
+
+        Returns: The score of the MLP for the given data sets.
+        """
         y_pred = self.predict(X)
 
         # Pearson R coefficient.
-        return np.mean((y - y.mean()) * (y_pred - y_pred.mean())) / np.sqrt(y.var() * y_pred.var())
+        return np.mean((y - y.mean()) * (y_pred - y_pred.mean())) / (np.sqrt(y.var() * y_pred.var()) + eps)
 
 
-class MLPClassifier(MLPRegressor):
+class MLPClassifier(MLP):
     """A MLP for classification tasks."""
 
     def __init__(self, layers, learning_rate=1.0, momentum=0.9, loss_func=None):
