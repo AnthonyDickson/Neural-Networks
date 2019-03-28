@@ -3,22 +3,22 @@ import numpy as np
 
 
 def load_iris(data_dir='data/'):
-    if not data_dir.endswith('/'):
-        data_dir += '/'
-
-    X = np.genfromtxt(data_dir + 'iris/in.txt')
-    y = np.genfromtxt(data_dir + 'iris/teach.txt')
-
-    return X, y
+    return load_dataset('iris', data_dir)
 
 
 def load_XOR(data_dir='data/'):
+    return load_dataset('xor', data_dir)
+
+
+def load_dataset(dataset, data_dir='data/'):
     if not data_dir.endswith('/'):
         data_dir += '/'
 
-    X = np.genfromtxt(data_dir + 'xor/in.txt')
-    y = np.genfromtxt(data_dir + 'xor/teach.txt')
-    y = y.reshape(-1, 1)
+    X = np.genfromtxt(data_dir + dataset + '/in.txt')
+    y = np.genfromtxt(data_dir + dataset + '/teach.txt')
+
+    if len(y.shape) == 1:
+        y = y.reshape(-1, 1)
 
     return X, y
 
