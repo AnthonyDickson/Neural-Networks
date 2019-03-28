@@ -14,33 +14,43 @@ def _int2char(integer):
 
 
 def ttest(cfgs, metric='val_scores', greater_than=True, results_dir='../results'):
-    dfs = []
+    config_data = []
     ttest_results = None
 
     print('%s distribution per configuration (μ ± 2σ)' % metric)
 
     for cfg in cfgs:
         a = np.load(results_dir + '/%s/%s.npy' % (cfg, metric))
+        a = a.T
         a = pd.DataFrame(a)
-        a = a.replace([np.inf, -np.inf], np.nan).dropna(axis=1)
-        a = a.iloc[:, -1]
+        a = a.replace([np.inf, -np.inf], np.nan)
 
-        print('%s: %.4f ± %.4f (n=%d)' % (_int2char(len(dfs)), a.mean(), 2 * a.std(), len(a)))
-        dfs.append(a)
+        # Find the last valid data point (highest epoch number).
+        idx = a.apply(pd.Series.last_valid_index)
+        idx = idx.dropna()
 
-    for i in range(len(dfs)):
-        baseline = dfs[i]
+        if len(idx) > 0:
+            a = a.values[idx, idx.index]
+            print('%s: %.4f ± %.4f (n=%d)' % (_int2char(len(config_data)), a.mean(), 2 * a.std(), len(a)))
+        else:
+            a = np.array([])
+            print('%s: NaN' % _int2char(len(config_data)))
 
-        for j in range(i + 1, len(dfs)):
+        config_data.append(a)
+
+    for i in range(len(config_data)):
+        baseline = config_data[i]
+
+        for j in range(i + 1, len(config_data)):
             if greater_than:
                 d = '>'
-                ttest_results = stats.ttest_ind(dfs[j], baseline, equal_var=False)
+                ttest_results = stats.ttest_ind(config_data[j], baseline, equal_var=False)
             else:
                 d = '<'
                 # The hypothesis is that x < baseline, or baseline > x. Therefore baseline is placed on lhs since we
                 # expect it to be larger. This means a positive t-statistic can be interpreted as positive support for
                 # the hypothesis and vice versa.
-                ttest_results = stats.ttest_ind(baseline, dfs[j], equal_var=False)
+                ttest_results = stats.ttest_ind(baseline, config_data[j], equal_var=False)
 
             print('%s %s %s:' % (_int2char(j), d, _int2char(i)), ttest_results)
 
@@ -97,6 +107,7 @@ def _unwrap(a):
     return a[0] if len(a) == 1 else a
 
 
+# TODO: Add support for activation functions.
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run a Welch t-test on a subset of the experiment results.\n'
                                                  'One parameter should be defined as a list of values. For example, '
