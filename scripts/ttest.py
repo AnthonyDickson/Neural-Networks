@@ -108,6 +108,8 @@ def _unwrap(a):
 
 
 # TODO: Add support for activation functions.
+# TODO: Produce a ranked list of configurations with the μ ± 2σ, min, max, t-stastic, and p-value (for having less loss) for
+#  the training loss, validation loss, and validation score. Or perhaps just make this a pandas dataframe.
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run a Welch t-test on a subset of the experiment results.\n'
                                                  'One parameter should be defined as a list of values. For example, '
