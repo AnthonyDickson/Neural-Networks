@@ -2,13 +2,13 @@
 COSC420 Neural Networks Assignment
 
 ## Getting Started
-1.  Set up your python environment, making sure that the packages in the `environment.yml` file are installed.
+1.  Set up your python environment.
 
     If you are using conda you can do this by running the following command:
     ```bash
     $ conda env create -f environment.yml
     ```
-    This will create a new conda environment called 'cosc420'.
+    This will create a new conda environment called 'cosc420' which should be used for running code in this project.
 
     Otherwise, ensure that your python environment has the packages listed in `environment.yml` installed.
 
