@@ -1,5 +1,6 @@
 name: cosc420
 dependencies:
+  - jupyter
   - matplotlib
   - numpy
   - pandas
