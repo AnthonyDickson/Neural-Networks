@@ -19,6 +19,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--dataset-path', type=str, default='../data/xor', help='The path to a dataset.')
     parser.add_argument('-s', '--shuffle', action='store_true',
                         help='Flag indicating that the dataset should be shuffled.')
+    # TODO: Add flag for using batch mode or standard SGD.
 
     args = parser.parse_args()
     print(args)

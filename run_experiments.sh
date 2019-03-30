@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 
 # Argument parsing adapted from https://stackoverflow.com/a/5476278
-usage="$(basename "$0") [-h] [-t n] [-j n] [-e] -- Utility for running experiments with grid search.
+usage="$(basename "$0") [-h] [-t n] [-j n] [-s n][-e] -- Utility for running experiments with grid search.
 
 where:
     -h  show this help text
     -t N_TRIALS     How many times each grid search parameter set should be run (default: 20)
     -j N_JOBS       The number of processors to use (default: 1)
+    -s N_SPLITS     How many folds to use for cross validations (default: 5)
     -e SEND_EMAIL   Flag indicating that an email should be sent when all grid search runs are finished.
                     Make sure you have the environment variable 'EMAIL_NOTIFICATION_ADDRESS' set to the
                     email address you want to receive the email notification with.
@@ -14,6 +15,7 @@ where:
 
 n_trials=20
 n_jobs=1
+n_splits=5
 send_email=false
 
 while getopts ':ht:j::e' option; do
@@ -24,6 +26,8 @@ while getopts ':ht:j::e' option; do
     t) n_trials=$OPTARG
        ;;
     j) n_jobs=$OPTARG
+       ;;
+    s) n_splits=$OPTARG
        ;;
     e) send_email=true
        ;;
@@ -61,7 +65,7 @@ do
     echo "Number of Jobs: $n_jobs"
     echo "Number of Trials per Configuration: $n_trials"
     echo
-    python grid_search.py ${cfg} --n-jobs ${n_jobs} --n-trials ${n_trials} 2>> errors.log
+    python grid_search.py ${cfg} --n-jobs ${n_jobs} --n-trials ${n_trials} --n-splits ${n_splits} 2>> errors.log
     echo "$sep"
     echo
 done
