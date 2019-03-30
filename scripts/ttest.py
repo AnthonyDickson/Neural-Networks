@@ -30,6 +30,7 @@ def ttest(cfgs, metric='val_scores', greater_than=True, results_dir='../results'
         idx = idx.dropna()
 
         if len(idx) > 0:
+            idx = idx.astype(np.int)
             a = a.values[idx, idx.index]
             print('%s: %.4f ± %.4f (n=%d)' % (_int2char(len(config_data)), a.mean(), 2 * a.std(), len(a)))
         else:
@@ -107,13 +108,13 @@ def _unwrap(a):
     return a[0] if len(a) == 1 else a
 
 
-# TODO: Add support for activation functions.
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run a Welch t-test on a subset of the experiment results.\n'
                                                  'One parameter should be defined as a list of values. For example, '
                                                  'if you wanted to see what batch size gives better results then you '
                                                  'could set the batch size arguments to `[16, 32]`')
     parser.add_argument('-r', '--results-dir', type=str, default='../results', help='Where the results are located.')
+    parser.add_argument('-a', '--activation-func', type=str, nargs='+', required=True)
     parser.add_argument('-b', '--batch-size', type=int, nargs='+', required=True)
     parser.add_argument('-c', '--clf-type', type=str, nargs='+', required=True)
     parser.add_argument('-d', '--dataset', type=str, nargs='+', required=True)
@@ -126,6 +127,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     params = {
+        'activation_func': _unwrap(args.activation_func),
         'batch_size': _unwrap(args.batch_size),
         'clf_type': _unwrap(args.clf_type),
         'dataset': _unwrap(args.dataset),
