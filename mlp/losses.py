@@ -10,7 +10,7 @@ class Loss:
 
     A loss function provides two sets of functionality:
     1. Calculation of loss given a set of ground truths and predictions
-    2. Storing of the gradient of the previously calculated loss.
+    2. Calculation of the gradient of the previously calculated loss.
     """
 
     def __init__(self):
@@ -69,11 +69,14 @@ class BinaryCrossEntropy(Loss):
 
 class CategoricalCrossEntropy(Loss):
     def __call__(self, y, y_pred):
-        loss = -np.sum(y * np.log(y_pred + 1e-9), axis=1)
+        # Small value added to y_pred to avoid log(0), which is undefined.
+        loss = -np.sum(y * np.log(y_pred + 1e-15), axis=1)
 
-        self.grad = self.derivative(y, y_pred + 1e-9)
+        self.grad = self.derivative(y, y_pred + 1e-15)
 
         return loss
 
     def derivative(self, y, y_pred):
+        # This is the derivative of both cross entropy and the softmax
+        # activation.
         return y_pred - y

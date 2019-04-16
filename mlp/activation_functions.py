@@ -123,11 +123,16 @@ class Sigmoid(Activation):
 class Softmax(Activation):
     """The softmax activation function."""
 
+    def __init__(self):
+        self.prev_input = None
+
     def __call__(self, X):
+        self.prev_input = X
         Z = np.exp(X)
 
         return Z / Z.sum(axis=1, keepdims=True)
 
     def derivative(self, Y):
-        # return np.diagflat(Y) * np.dot(Y, Y.T)
-        return np.ones_like(Y)  # TODO: Is this fine?
+        # Assuming softmax is only ever used with cross entropy loss, the
+        # derivative is already calculated with the derivative of the loss.
+        return np.ones_like(Y)
