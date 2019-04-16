@@ -1,3 +1,4 @@
+import itertools
 import os
 
 import matplotlib.pyplot as plt
@@ -45,6 +46,7 @@ variables = ['activation_func', 'batch_size', 'clf_type', 'dataset',
 
 datasets = df['dataset'].unique()
 metrics = ['train_loss', 'train_scores', 'val_loss', 'val_scores']
+summary_stats = [stat + '_' + metric for metric, stat in itertools.product(metrics,['median', 'mean', 'std'])]
 
 def print_stats(dataframe, name='a'):
     a = dataframe
