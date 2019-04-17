@@ -127,8 +127,8 @@ class DenseLayer(Layer):
         """Create and initialise the weight and bias matrices."""
         super().initialise_weights()
 
-        self.W = np.random.normal(0, 1, (self.n_inputs, self.n_units)) * np.sqrt(1.0 / self.n_inputs)
-        self.b = np.random.normal(0, 1, (1, self.n_units))
+        self.W = np.random.normal(0, 0.1, (self.n_inputs, self.n_units)) * np.sqrt(1.0 / self.n_inputs)
+        self.b = np.random.normal(0, 0.1, (1, self.n_units))
         self.prev_dW = np.zeros_like(self.W)
         self.prev_db = np.zeros_like(self.b)
 
