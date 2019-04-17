@@ -148,7 +148,7 @@ def pad(a, length, fill_value=float('-inf')):
 
 
 def evaluation_step(clf, batch_size, shuffle_batches, X_train, y_train, val_set=0, n_epochs=10000):
-    es = EarlyStopping(patience=100, criterion=0.99)
+    es = EarlyStopping(patience=1000, criterion=0.99)
 
     train_loss, train_score, val_loss, val_score = clf.fit(X_train, y_train, val_set=val_set,
                                                            n_epochs=n_epochs, batch_size=batch_size,
