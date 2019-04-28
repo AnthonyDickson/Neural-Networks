@@ -281,10 +281,13 @@ class MLP:
 
     def _train_val_split(self, X, y, val_set):
         if type(val_set) is int or type(val_set) is float:
+
+            # Check if the validation set is too small to use the `stratify` option
             if (type(val_set) is int and val_set < len(np.unique(y))) or val_set * len(X) < len(np.unique(y)):
                 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_set)
             else:
                 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_set, stratify=y)
+
         elif type(val_set) is tuple:
             X_train, y_train = X, y
             X_val, y_val = val_set
