@@ -42,12 +42,14 @@ def setup(results_dir):
 
             param_names = list(stats['params'].keys())
             data_fields = ['%s_%02d' % (metric, n) for metric in metrics for n in range(n_trials)]
+            data_fields += ['n_epochs_%02d' % n for n in range(n_trials)]
             df = pd.DataFrame(columns=['run_id'] + param_names + data_fields)
             df = df.set_index('run_id')
 
             break
 
     return df, n_trials
+
 
 def add_failure_stats(df):
     # Failure for a regression model is when the RMSE loss gets stuck at 0.5. This does not apply to all models and datasets
@@ -57,7 +59,7 @@ def add_failure_stats(df):
 
     # axis=1 takes the sum along the rows (axis=0 does this along the columns)
     fail_count = (np.abs(df_regression[train_loss_cols] - 0.5) < 0.01).sum(axis=1) + \
-                 (df_regression[train_loss_cols].isna().sum(axis=1)) 
+                 (df_regression[train_loss_cols].isna().sum(axis=1))
     fail_rate = fail_count / len(train_loss_cols)
     df_regression = df_regression.assign(fail_count=fail_count, fail_rate=fail_rate)
 
@@ -75,27 +77,32 @@ def add_failure_stats(df):
 
     return df
 
+
 def add_summary_stats(df):
     train_loss_cols = df.filter(regex='train_loss_\d{2}').columns.values
     train_scores_cols = df.filter(regex='train_scores_\d{2}').columns.values
     val_loss_cols = df.filter(regex='val_loss_\d{2}').columns.values
     val_scores_cols = df.filter(regex='val_scores_\d{2}').columns.values
-    
+    n_epochs_cols = df.filter(regex='n_epochs_\d{2}').columns.values
+
     df['mean_train_loss'] = df[train_loss_cols].mean(axis=1)
     df['mean_train_scores'] = df[train_scores_cols].mean(axis=1)
-    df['mean_val_loss'] = df[train_loss_cols].mean(axis=1)
-    df['mean_val_scores'] = df[train_scores_cols].mean(axis=1)
-    
+    df['mean_val_loss'] = df[val_loss_cols].mean(axis=1)
+    df['mean_val_scores'] = df[val_scores_cols].mean(axis=1)
+    df['mean_n_epochs'] = df[n_epochs_cols].mean(axis=1)
+
     df['median_train_loss'] = df[train_loss_cols].median(axis=1)
     df['median_train_scores'] = df[train_scores_cols].median(axis=1)
-    df['median_val_loss'] = df[train_loss_cols].median(axis=1)
-    df['median_val_scores'] = df[train_scores_cols].median(axis=1)
-    
+    df['median_val_loss'] = df[val_loss_cols].median(axis=1)
+    df['median_val_scores'] = df[val_scores_cols].median(axis=1)
+    df['median_n_epochs'] = df[n_epochs_cols].median(axis=1)
+
     df['std_train_loss'] = df[train_loss_cols].std(axis=1)
     df['std_train_scores'] = df[train_scores_cols].std(axis=1)
-    df['std_val_loss'] = df[train_loss_cols].std(axis=1)
-    df['std_val_scores'] = df[train_scores_cols].std(axis=1)
-    
+    df['std_val_loss'] = df[val_loss_cols].std(axis=1)
+    df['std_val_scores'] = df[val_scores_cols].std(axis=1)
+    df['std_n_epochs'] = df[n_epochs_cols].std(axis=1)
+
     return df
 
 
@@ -139,14 +146,16 @@ def main(results_dir, output_file):
                             the_column = '%s_%02d' % (metric, col)
                             # `row` is sometimes a float, indexing requires ints
                             series[the_column] = a.iloc[int(row), col]
+                            # Record how many epochs this trial was trained for
+                            series['n_epochs_%02d' % col] = row
 
             df.loc[stats['run_id']] = series
 
     print()
-    
+
     df = add_failure_stats(df)
     df = add_summary_stats(df)
-    
+
     df.to_csv(output_file)
 
 
