@@ -310,7 +310,7 @@ def make_boxplot(df, base_mask, variable_mask, a_config, b_config, metric, title
     
     return fig, axes
 
-def make_n_way_boxplot(df, base_mask, variable_masks, configs, metric, title, double_plot=True):    
+def make_n_way_boxplot(df, base_mask, variable_masks, configs, metric, title, double_plot=True, show_fliers=True):    
     """Make box plots comparing multiple values of a variable (e.g. different learning rates)
     in terms of one of the four metrics (train_loss, train_scores, val_loss, val_scores).
     
@@ -327,7 +327,8 @@ def make_n_way_boxplot(df, base_mask, variable_masks, configs, metric, title, do
         
     :param metric: The metric by which the configurations of the variable from variable_mask should be compared.
     :param title: The title of the plot.
-    :param double_plot: Whether or not to plot two plots, one with outliers and one without, or whether to plot a single plot with the outliers shown.
+    :param double_plot: Whether or not to plot two plots, one with outliers and one without, or whether to plot a single plot.
+    :param show_fliers: Whether or not to plots outliers if `double_plot` is False.
     
     :return: The figure and axes of the plot.
     """
@@ -355,7 +356,7 @@ def make_n_way_boxplot(df, base_mask, variable_masks, configs, metric, title, do
     else:
         fig, axes = plt.subplots(1, 1, squeeze=True, figsize=(6, 4))
 
-        axes.boxplot(groups, showfliers=True)
+        axes.boxplot(groups, showfliers=show_fliers)
         axes.set_xticklabels(ticks)
         axes.set_title(title)
 
