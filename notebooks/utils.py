@@ -42,7 +42,7 @@ def classification_mask(df):
     return df['clf_type'] == 'MLPClassifier'
 
 # Dataset
-def _535_mask(df):
+def get_535_mask(df):
     return df['dataset'] == '535'
 
 def encoder_mask(df):
@@ -95,7 +95,7 @@ def print_stats(dataframe, name='a'):
 def format_p_value(p_value):
     return str(p_value % 1)[1:5] if p_value > 0.001 else '<.001'
         
-def stat_test(df, base_mask, variable_mask, test_name, alpha=0.001):    
+def stat_test(df, base_mask, variable_mask, metric, test_name,alpha=0.001):    
     """Perform a hypothesis test on two subgroups, `a` and `NOT a`.
     
     :param df: The data source dataframe.
@@ -105,30 +105,30 @@ def stat_test(df, base_mask, variable_mask, test_name, alpha=0.001):
     :param variable_mask: The mask for configuration `a` that you want to compare against `NOT a` 
         (e.g. regression models vs. classification models, ReLU vs Sigmoid).
         This should be a boolean mask of `df`.
+    :param metric: The metric to use for comparing the two groups, e.g. 'val_loss'.
     :param alpha: The significance threshold.
     """
     print('*' * 80)
     print(test_name)
     print('*' * 80)
     
-    for metric in metrics + ['fail_rate']:
-        print('#'  * len(metric))
-        print(metric)
-        print('#'  * len(metric))
-    
-        metric_pattern = metric if metric == 'fail_rate' else metric + '_\d{2}'
-        a = df[base_mask & variable_mask].filter(regex=metric_pattern)
-        b = df[base_mask & ~variable_mask].filter(regex=metric_pattern)
-    
-        print_stats(a, name='a')
-        print()
+    print('#'  * len(metric))
+    print(metric)
+    print('#'  * len(metric))
 
-        print_stats(b, name='b')
-        print()
-        
-        print('Welch t-test:')
-        t, p = stats.ttest_ind(a.values.ravel(), b.values.ravel(), equal_var=False, nan_policy='omit')
-        print('t: %.4f - p: %s' % (t, format_p_value(p)))
+    metric_pattern = metric if metric == 'fail_rate' else metric + '_\d{2}'
+    a = df[base_mask & variable_mask].filter(regex=metric_pattern)
+    b = df[base_mask & ~variable_mask].filter(regex=metric_pattern)
+
+    print_stats(a, name='a')
+    print()
+
+    print_stats(b, name='b')
+    print()
+
+    print('Welch t-test:')
+    t, p = stats.ttest_ind(a.values.ravel(), b.values.ravel(), equal_var=False, nan_policy='omit')
+    print('t: %.4f - p: %s' % (t, format_p_value(p)))
 
 
 def plot(df, thresholds=(10, -1, 10, -1)):
@@ -310,7 +310,7 @@ def make_boxplot(df, base_mask, variable_mask, a_config, b_config, metric, title
     
     return fig, axes
 
-def make_n_way_boxplot(df, base_mask, variable_masks, configs, metric, title):    
+def make_n_way_boxplot(df, base_mask, variable_masks, configs, metric, title, double_plot=True):    
     """Make box plots comparing multiple values of a variable (e.g. different learning rates)
     in terms of one of the four metrics (train_loss, train_scores, val_loss, val_scores).
     
@@ -327,6 +327,7 @@ def make_n_way_boxplot(df, base_mask, variable_masks, configs, metric, title):
         
     :param metric: The metric by which the configurations of the variable from variable_mask should be compared.
     :param title: The title of the plot.
+    :param double_plot: Whether or not to plot two plots, one with outliers and one without, or whether to plot a single plot with the outliers shown.
     
     :return: The figure and axes of the plot.
     """
@@ -341,15 +342,22 @@ def make_n_way_boxplot(df, base_mask, variable_masks, configs, metric, title):
 
     ticks = ['%s \n(n=%d)' % (config, len(subgroup)) for config, subgroup in zip(configs, groups)]
 
-    fig, axes = plt.subplots(1, 2, squeeze=True, figsize=(12, 4))
+    if double_plot:
+        fig, axes = plt.subplots(1, 2, squeeze=True, figsize=(12, 4))
 
-    axes[0].boxplot(groups, showfliers=True)
-    axes[0].set_xticklabels(ticks)
-    axes[0].set_title(title)
+        axes[0].boxplot(groups, showfliers=True)
+        axes[0].set_xticklabels(ticks)
+        axes[0].set_title(title)
 
-    axes[1].boxplot(groups, showfliers=False)
-    axes[1].set_xticklabels(ticks)
-    axes[1].set_title('%s (Outliers Hidden)' % title)
+        axes[1].boxplot(groups, showfliers=False)
+        axes[1].set_xticklabels(ticks)
+        axes[1].set_title('%s (Outliers Hidden)' % title)
+    else:
+        fig, axes = plt.subplots(1, 1, squeeze=True, figsize=(6, 4))
+
+        axes.boxplot(groups, showfliers=True)
+        axes.set_xticklabels(ticks)
+        axes.set_title(title)
 
     fig.tight_layout()
     
