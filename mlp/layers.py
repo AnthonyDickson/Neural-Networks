@@ -178,7 +178,7 @@ class DenseLayer(Layer):
         return delta
 
     def __str__(self):
-        return '%s(n_inputs=%d, n_units=%d, activation_func=%s())' \
+        return '%s(n_inputs=%d, n_units=%d, activation_func=%s)' \
                % (self.__class__.__name__, self.n_inputs, self.n_units, str(self.activation_func))
 
     def to_json(self):
