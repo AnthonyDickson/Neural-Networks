@@ -197,7 +197,7 @@ class DenseLayer(Layer):
 
 
 class GaussianNoise(Layer):
-    """This layer adds gaussian distributed noise to is inputs.
+    """This layer adds gaussian distributed noise to its inputs.
 
     During back-propagation, this layer is skipped over.
     """
