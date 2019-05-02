@@ -12,6 +12,7 @@ class Loss:
     1. Calculation of loss given a set of ground truths and predictions
     2. Calculation of the gradient of the previously calculated loss.
     """
+    EPSILON = 1e-15
 
     def __init__(self):
         self.grad = None  # the gradient, or derivative of the loss function w.r.t the output.
@@ -57,8 +58,8 @@ class RMSE(Loss):
 
 class BinaryCrossEntropy(Loss):
     def __call__(self, y, y_pred):
-        # loss = np.where(y == 1, -y * np.log(y_pred), np.log(1 - y_pred))
-        loss = -y * np.log(y_pred) - (1 - y) * np.log(1 - y_pred)
+        loss = -y * np.log(y_pred + Loss.EPSILON) - \
+               (1 - y) * np.log(1 - y_pred + Loss.EPSILON)
         self.grad = self.derivative(y, y_pred)
 
         return loss
@@ -70,9 +71,9 @@ class BinaryCrossEntropy(Loss):
 class CategoricalCrossEntropy(Loss):
     def __call__(self, y, y_pred):
         # Small value added to y_pred to avoid log(0), which is undefined.
-        loss = -np.sum(y * np.log(y_pred + 1e-15), axis=1)
+        loss = -np.sum(y * np.log(y_pred + Loss.EPSILON), axis=1)
 
-        self.grad = self.derivative(y, y_pred + 1e-15)
+        self.grad = self.derivative(y, y_pred + Loss.EPSILON)
 
         return loss
 
