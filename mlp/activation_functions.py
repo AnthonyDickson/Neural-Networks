@@ -50,7 +50,10 @@ class Activation:
         module = __import__(Activation.__module__)
         class_ = getattr(module.activation_functions, json_dict['activation_type'])
 
-        return class_.from_json(json_dict)
+        if class_ is LeakyReLU:
+            return class_.from_json(json_dict)
+        else:
+            return class_()
 
 
 class Identity(Activation):
@@ -99,13 +102,16 @@ class LeakyReLU(Activation):
 
     def to_json(self):
         json_dict = super().to_json()
-        json_dict['alpha'] = self.alpha
+        json_dict['alpha'] = str(self.alpha)
 
         return json_dict
 
     @staticmethod
     def from_json(json_dict):
-        return LeakyReLU(alpha=json_dict['alpha'])
+        if 'alpha' in json_dict:
+            return LeakyReLU(alpha=json_dict['alpha'])
+        else:
+            return LeakyReLU()
 
 
 class Sigmoid(Activation):
