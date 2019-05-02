@@ -2,13 +2,6 @@
   "clf_type": "MLPClassifier",
   "layers": [
     {
-      "layer_type": "GaussianNoise",
-      "n_inputs": 4,
-      "n_units": 4,
-      "mean": 0,
-      "std": 0.01
-    },
-    {
       "layer_type": "DenseLayer",
       "n_inputs": 4,
       "n_units": 4,
@@ -25,7 +18,7 @@
       }
     }
   ],
-  "learning_rate": 0.1,
+  "learning_rate": 0.01,
   "momentum": 0.9,
   "loss_func": "CategoricalCrossEntropy"
 }

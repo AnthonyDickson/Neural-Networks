@@ -1,12 +1,12 @@
 {
-  "clf_type": "MLPRegressor",
+  "clf_type": "MLPClassifier",
   "layers": [
     {
       "layer_type": "DenseLayer",
       "n_inputs": 2,
       "n_units": 2,
       "activation_func": {
-        "activation_type": "Sigmoid"
+        "activation_type": "LeakyReLU"
       }
     },
     {
@@ -14,11 +14,11 @@
       "n_inputs": 2,
       "n_units": 1,
       "activation_func": {
-        "activation_type": "Identity"
+        "activation_type": "Sigmoid"
       }
     }
   ],
   "learning_rate": 0.2,
   "momentum": 0.9,
-  "loss_func": "MSE"
+  "loss_func": "BinaryCrossEntropy"
 }

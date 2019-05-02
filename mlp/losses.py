@@ -68,6 +68,8 @@ class BinaryCrossEntropy(Loss):
         loss = -y * np.log(y_pred + Loss.EPSILON) - \
                (1 - y) * np.log(1 - y_pred + Loss.EPSILON)
 
+        loss = loss.mean(axis=1, keepdims=True)
+
         self.grad = self.derivative(y, y_pred)
 
         return loss

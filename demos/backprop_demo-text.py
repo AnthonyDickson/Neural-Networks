@@ -99,7 +99,7 @@ class Demo:
                 print()
 
             print('Network Prediction:')
-            print(self.model.predict(self.X))
+            print(self.model.predict(nums))
 
     def forward_pass(self):
         self.display('************')
