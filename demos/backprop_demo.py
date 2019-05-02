@@ -16,6 +16,8 @@ from mlp.network import MLP
 
 class Demo:
     def __init__(self, model_file, dataset_path, shuffle, log_frequency=100, max_display_rows=4):
+        self.model_file = model_file
+
         with open(model_file, 'r') as f:
             self.model_json = json.load(f)
 
@@ -40,7 +42,7 @@ class Demo:
 
         self.y_pred = np.array([])
         self.logits = np.array([])
-        self.loss_history = []
+        self.loss_history = np.array([])
 
         self.model = MLP.from_json(self.model_json)
 
@@ -76,7 +78,7 @@ class Demo:
         plt.xlim(0)
         plt.xlabel('Epoch')
         plt.ylabel('%s Loss' % self.model.loss_func.__class__.__name__)
-        plt.title('Loss vs. Epochs for model loaded from \'%s\'' % args.model_file)
+        plt.title('Loss vs. Epochs for model loaded from \'%s\'' % self.model_file)
         plt.legend()
         plt.show()
 
@@ -97,25 +99,16 @@ class Demo:
                 print('Invalid input: input should be %d numbers separated by spaces.' % self.input_dims)
                 continue
 
-            print('Forward pass.')
-            input_ = nums
-
-            for layer in self.model.layers:
-                print('Output of layer:', layer)
-                output = layer.forward(input_)
-                input_ = output
-
-                print(self.get_matrix_display_string(output))
-                print()
+            self.forward_pass(np.array([nums]))
 
             print('Network Prediction:')
             print(self.model.predict(nums))
 
-    def forward_pass(self):
+    def forward_pass(self, X):
         self.display('************')
         self.display('Forward pass')
         self.display('************')
-        output = self.X
+        output = X
         self.display('Input:\n', self.get_matrix_display_string(output), '\n')
 
         for layer in self.model.layers:
@@ -123,8 +116,6 @@ class Demo:
             output = layer.forward(output)
             self.display(self.get_matrix_display_string(output))
             self.display()
-
-        self.prompt()
 
     def backward_pass(self):
         self.display('*************')
@@ -151,8 +142,6 @@ class Demo:
                 self.model.loss_func(self.y[i:i + 1], self.model._forward(self.X[i:i + 1]))
                 self.model._backward()
 
-        self.prompt()
-
     def epoch_summary(self):
         self.display('*************')
         self.display('Epoch Results')
@@ -162,7 +151,7 @@ class Demo:
 
         loss = self.model.loss_func(self.y, self.model._forward(self.X, is_training=False))
         loss = loss.mean()
-        self.loss_history.append(loss)
+        self.loss_history = np.append(self.loss_history, loss)
 
         self.y_pred = self.model.predict(self.X)
 
@@ -175,8 +164,6 @@ class Demo:
             self.display('Epoch loss: %.4f' % loss)
             self.display('Epoch score: %.4f' % score)
             self.display()
-
-        self.prompt()
 
     def command_loop(self):
         exit_loop = False
@@ -227,7 +214,7 @@ class Demo:
                     self.skip_epochs = int(self.skip_epochs)
 
                 if self.skip_epochs > 0:
-                    print('Skipping forward %d epochs...' % self.skip_epochs)
+                    print('Training for %d epochs...' % self.skip_epochs)
                     self.skipping = True
 
                 exit_loop = True
@@ -242,9 +229,14 @@ class Demo:
                 if self.should_quit:
                     break
 
-            self.forward_pass()
+            self.forward_pass(self.X)
+            self.prompt()
+
             self.backward_pass()
+            self.prompt()
+
             self.epoch_summary()
+            self.prompt()
 
             self.display('End of epoch %d.' % (self.epoch + 1))
             self.epoch += 1

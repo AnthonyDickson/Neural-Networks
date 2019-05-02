@@ -229,7 +229,7 @@ if __name__ == '__main__':
             print('Epoch score: %.4f' % model.score(X, y))
 
             cmd = input('Enter `q` to quit, '
-                        '`skip n` to skip forward n epochs, '
+                        '`train n` to train for n epochs, '
                         '`plot` to plot the loss history so far, '
                         'or press enter continue: ')
 
@@ -240,14 +240,14 @@ if __name__ == '__main__':
                 break
             elif cmd == 'plot':
                 plot(loss_history)
-            elif parts and parts[0] == 'skip' and len(parts) == 2:
+            elif parts and parts[0] == 'train' and len(parts) == 2:
                 try:
                     skip_epochs = int(parts[1])
                 except ValueError:
                     skip_epochs = input('\'%s\' is not a number. Enter an integer:' % str(parts[1]))
                     skip_epochs = int(skip_epochs)
 
-                print('Skipping forward %d epochs...' % skip_epochs)
+                print('Training for %d epochs...' % skip_epochs)
                 skip = True
 
             print()
@@ -258,7 +258,7 @@ if __name__ == '__main__':
             y_pred = model._forward(X[sample].reshape(1, -1))
             error = y[sample] - y_pred
             loss = model.loss_func(y[sample], y_pred)
-            loss_history[epoch] += loss / len(X)
+            loss_history[epoch] += loss.mean() / len(X)
 
             g = graphviz.Digraph()
             g.attr('graph', rankdir='LR', ranksep='1.4')
