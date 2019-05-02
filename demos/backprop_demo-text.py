@@ -6,6 +6,7 @@ sys.path.append(os.path.abspath('../'))
 import argparse
 import json
 
+import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import utils
 
@@ -69,6 +70,15 @@ class Demo:
         n_omitted_rows = len(matrix) - self.max_display_rows
 
         return str(matrix[:self.max_display_rows]) + '\n%d rows omitted...' % n_omitted_rows
+
+    def plot(self):
+        plt.plot(self.loss_history, label='train')
+        plt.xlim(0)
+        plt.xlabel('Epoch')
+        plt.ylabel('%s Loss' % self.model.loss_func.__class__.__name__)
+        plt.title('Loss vs. Epochs for model loaded from \'%s\'' % args.model_file)
+        plt.legend()
+        plt.show()
 
     def test_loop(self):
         while True:
@@ -181,6 +191,7 @@ class Demo:
                         '`train n` to train for n epochs, \n'
                         '`weights` to print the network weights, \n'
                         '`test` to manually input a pattern, \n'
+                        '`plot` to plot the loss history so far, \n'
                         'or press enter continue: ')
 
             cmd = cmd.strip()
@@ -197,6 +208,8 @@ class Demo:
                 exit_loop = True
             elif cmd == 'reset':
                 self.reset()
+            elif cmd == 'plot':
+                self.plot()
             elif cmd == 'weights':
                 for layer in self.model.layers:
                     if isinstance(layer, DenseLayer):

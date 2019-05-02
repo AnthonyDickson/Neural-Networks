@@ -90,7 +90,7 @@ def backward_pass_viz(g):
 
     last_layer = l
 
-    for l in range(len(model.layers) - 2, 0, -1):
+    for l in range(len(model.layers) - 2, -1, -1):
         # Skip misc layers.
         layer = model.layers[l]
 
