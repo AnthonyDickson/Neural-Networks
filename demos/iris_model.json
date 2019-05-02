@@ -12,13 +12,17 @@
       "layer_type": "DenseLayer",
       "n_inputs": 4,
       "n_units": 4,
-      "activation_func": "Sigmoid"
+      "activation_func": {
+        "activation_type": "LeakyReLU"
+      }
     },
     {
       "layer_type": "DenseLayer",
       "n_inputs": 4,
       "n_units": 3,
-      "activation_func": "Softmax"
+      "activation_func": {
+        "activation_type": "Softmax"
+      }
     }
   ],
   "learning_rate": 0.1,

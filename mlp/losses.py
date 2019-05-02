@@ -43,23 +43,31 @@ class Loss:
         return self.__class__.__name__
 
 
-class RMSE(Loss):
-    """The RMSE (Root Mean Square Error) loss function."""
+class MSE(Loss):
+    """The MSE (Mean Square Error) loss function."""
 
     def __call__(self, y, y_pred):
         error_term = y - y_pred
         self.grad = self.derivative(y, y_pred)
 
-        return np.sqrt(np.mean(np.square(error_term), axis=0))
+        return np.mean(np.square(error_term), axis=1, keepdims=True)
 
     def derivative(self, y, y_pred):
         return y_pred - y
+
+
+class RMSE(MSE):
+    """The RMSE (Root Mean Square Error) loss function."""
+
+    def __call__(self, y, y_pred):
+        return np.sqrt(super().__call__(y, y_pred))
 
 
 class BinaryCrossEntropy(Loss):
     def __call__(self, y, y_pred):
         loss = -y * np.log(y_pred + Loss.EPSILON) - \
                (1 - y) * np.log(1 - y_pred + Loss.EPSILON)
+
         self.grad = self.derivative(y, y_pred)
 
         return loss
@@ -71,9 +79,9 @@ class BinaryCrossEntropy(Loss):
 class CategoricalCrossEntropy(Loss):
     def __call__(self, y, y_pred):
         # Small value added to y_pred to avoid log(0), which is undefined.
-        loss = -np.sum(y * np.log(y_pred + Loss.EPSILON), axis=1)
+        loss = -np.sum(y * np.log(y_pred + Loss.EPSILON), axis=1, keepdims=True)
 
-        self.grad = self.derivative(y, y_pred + Loss.EPSILON)
+        self.grad = self.derivative(y, y_pred)
 
         return loss
 

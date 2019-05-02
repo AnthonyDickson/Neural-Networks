@@ -2,26 +2,23 @@
   "clf_type": "MLPRegressor",
   "layers": [
     {
-      "layer_type": "GaussianNoise",
-      "n_inputs": 2,
-      "n_units": 2,
-      "mean": 0,
-      "std": 0.01
-    },
-    {
       "layer_type": "DenseLayer",
       "n_inputs": 2,
       "n_units": 2,
-      "activation_func": "Sigmoid"
+      "activation_func": {
+        "activation_type": "Sigmoid"
+      }
     },
     {
       "layer_type": "DenseLayer",
       "n_inputs": 2,
       "n_units": 1,
-      "activation_func": "Identity"
+      "activation_func": {
+        "activation_type": "Identity"
+      }
     }
   ],
   "learning_rate": 0.1,
   "momentum": 0.9,
-  "loss_func": "RMSE"
+  "loss_func": "MSE"
 }
