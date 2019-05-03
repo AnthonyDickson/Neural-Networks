@@ -240,8 +240,10 @@ class MLP:
 
             for _, X_batch, y_batch in _generate_minibatches(X_train, y_train, batch_size, shuffle=shuffle_batches):
                 target_pred = self._forward(X_batch)
+
                 loss = self.loss_func(y_batch, target_pred)
                 epoch_train_loss_history = np.append(epoch_train_loss_history, loss)
+
                 score = self.score(X_batch, y_batch)
                 epoch_train_score_history = np.append(epoch_train_score_history, score)
 
@@ -280,6 +282,20 @@ class MLP:
         return train_loss_history, train_score_history, val_loss_history, val_score_history
 
     def _train_val_split(self, X, y, val_set):
+        """
+        Split the data into training and validation sets.
+
+        Arguments:
+            X: The feature data set for training the MLP on.
+            y: The target data set for training the MLP on.
+            val_set: The data set to be used for validation. This can be an
+            integer indicating how many samples from the training sets to use
+            for validation; or it can be a ratio indicating what proportion of
+            the training data to use for validation; or it can be a tuple
+            containing the X and y validation sets.
+
+        Returns: A 4-tuple containing the training features, validation features, training labels, and the validation labels
+        """
         if type(val_set) is int or type(val_set) is float:
 
             # Check if the validation set is too small to use the `stratify` option

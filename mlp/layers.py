@@ -214,6 +214,8 @@ class GaussianNoise(Layer):
     def W(self):
         """Get the weights of the next layer.
 
+        This is needed for backprop if the GaussianNoise is a hidden layer.
+
         Returns: The weight matrix of the next layer.
         """
         return self.next_layer.W
@@ -221,6 +223,8 @@ class GaussianNoise(Layer):
     @property
     def b(self):
         """Get the bias of the next layer.
+
+        This is needed for backprop if the GaussianNoise is a hidden layer.
 
         Returns: The bias vector of the next layer.
         """
